@@ -7,15 +7,27 @@ Dự án MVP IoT theo dõi và hỗ trợ chăm sóc cây ớt con trong vườn
 ```text
 .
 ├── README.md
+├── firmware/
+│   ├── sensors/
+│   └── network/
+├── backend/
+├── web/
+├── mobile/
 └── docs/
-    └── members/
-        ├── TKiet/
-        ├── QTien/
-        ├── TVan/
-        ├── TDat/
-        ├── DKhoa/
-        ├── QThang/
-        └── MThuy/
+    ├── members/
+    │   ├── TKiet/
+    │   ├── QTien/
+    │   ├── TVan/
+    │   ├── TDat/
+    │   ├── DKhoa/
+    │   ├── QThang/
+    │   └── MThuy/
+    ├── architecture/
+    ├── hardware/
+    ├── contracts/
+    ├── integration/
+    ├── agronomy/
+    └── testing/
 ```
 
 Mỗi thư mục thành viên chứa file Markdown mô tả trách nhiệm, đầu ra cần bàn giao và cách phối hợp của thành viên đó.
