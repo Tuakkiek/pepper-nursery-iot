@@ -57,4 +57,4 @@ Ngoài các branch thành viên, dự án có:
 3. Kiểm tra và tích hợp trên `dev`.
 4. Tạo Pull Request từ `dev` vào `main` khi nội dung đã hoàn tất.
 
-Branch `main` được cấu hình bảo vệ, không cho push trực tiếp và yêu cầu Pull Request có ít nhất một lượt phê duyệt.
+Branch `main` được cấu hình bảo vệ, không cho push trực tiếp; mọi thay đổi vẫn phải đi qua Pull Request nhưng không bắt buộc lượt phê duyệt.
