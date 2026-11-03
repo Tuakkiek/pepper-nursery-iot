@@ -1,5 +1,7 @@
 # 07 — MThuy: Quy tắc chăm sóc cây và kiểm thử
 
+**Phạm vi G0 v0.1:** quy tắc và ma trận kiểm thử xét đủ năm cảm biến; TDS/pH là phép đo mẫu nước/dung dịch, không phải đất. Backend là nơi tính quy tắc duy nhất sau khi ngưỡng và ca thử được duyệt. Xem `docs/architecture/mvp-scope.md` và `docs/integration/test-matrix.md`.
+
 **Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT  
 **Người phụ trách chính:** MThuy  
 **Trách nhiệm chính:** Xây dựng quy tắc chăm sóc cây, bộ dữ liệu mẫu, phương pháp đối chiếu số đo và kế hoạch kiểm thử toàn hệ thống.  
@@ -14,7 +16,7 @@ Một **bộ quy tắc chăm sóc vườn ươm ớt con có nguồn và điều
 | MThuy trực tiếp làm | Chủ sở hữu phần liên quan |
 | --- | --- |
 | Tìm căn cứ cho quy tắc, mô tả điều kiện/ngưỡng, mức ưu tiên và câu chữ lời khuyên; ghi nguồn, giả định, phiên bản và trường hợp không áp dụng | TKiet: chốt phạm vi MVP và nơi chạy quy tắc; TDat/DKhoa/QThang: triển khai theo kiến trúc đã chốt |
-| Đề xuất phương pháp đối chiếu số đo thực tế; ghi điều kiện tham chiếu và đánh giá xem phần trăm độ ẩm đất đã đủ cơ sở sử dụng | QTien: mã đọc/xử lý cảm biến và tham số hiệu chuẩn HD‑38; TKiet: đấu nối, vị trí lắp và mạch thật |
+| Đề xuất phương pháp đối chiếu số đo thực tế; đánh giá xem %, ppm và pH đã đủ cơ sở sử dụng | QTien: mã đọc/xử lý và tham số hiệu chuẩn HD‑38/TDS/pH; TKiet: đấu nối, vị trí lắp và mạch thật |
 | Thiết kế fixture/ca thử, chạy kiểm thử liên nhóm, ghi bằng chứng và issue, kiểm tra lại sau khi sửa | QTien, TVan, TDat, DKhoa và QThang: sửa lỗi trong module mình sở hữu; TKiet: điều phối tích hợp và quyết định mốc bàn giao |
 
 **Vùng sở hữu đề xuất:** `docs/agronomy/`, `docs/testing/` và fixture quy tắc/kiểm thử. MThuy góp ý `docs/contracts/sensor-reading.md`, `docs/contracts/api.md` và `docs/integration/test-matrix.md`; TKiet chủ trì chốt tài liệu chung. Không tự sửa mã firmware, backend, web hoặc mobile để vượt qua ca kiểm thử.
@@ -23,11 +25,11 @@ Một **bộ quy tắc chăm sóc vườn ươm ớt con có nguồn và điều
 
 ### Dữ liệu đầu vào cho quy tắc
 
-Tại **Phase 0 (G0)**, cùng QTien/TVan/TDat chốt ý nghĩa nhiệt độ không khí, độ ẩm không khí, nhiệt độ đất, số đọc thô HD‑38 và phần trăm độ ẩm đất **sau hiệu chuẩn**; trạng thái từng cảm biến, giá trị `null`, thời điểm đo/nhận và tiêu chí dữ liệu cũ. Các tên trường ở file 01 chỉ là khung thảo luận, chưa phải schema chính thức. Một giá trị `0` hợp lệ không được coi là thiếu; số đọc thô HD‑38 không được hiểu thành `%` nếu chưa có phép quy đổi đã kiểm chứng.
+Tại **Phase 0 (G0)**, cùng QTien/TVan/TDat xác nhận ý nghĩa nhiệt độ/độ ẩm không khí, nhiệt độ/độ ẩm đất, TDS và pH mẫu nước/dung dịch theo `docs/contracts/sensor-reading.md`. HD‑38, TDS và pH có số thô; giá trị %, ppm, pH chỉ dùng sau hiệu chuẩn. Một giá trị `0` hợp lệ khác `null`; dữ liệu cũ/lỗi/chưa hiệu chuẩn không được dùng để kết luận chăm sóc.
 
 ### Nơi xử lý và bàn giao quy tắc
 
-TKiet cùng TDat/DKhoa/QThang/MThuy chốt **một nơi tính kết quả quy tắc** ở G0. MThuy giao tài liệu đặc tả và các ca ví dụ đầu vào → kết quả mong đợi; người sở hữu nơi xử lý triển khai. DKhoa/QThang hiển thị cùng thông điệp và trạng thái theo hợp đồng. Nếu MVP chỉ hiển thị dữ liệu đo mà chưa tự động tính lời khuyên, MThuy vẫn cung cấp bảng diễn giải và ca kiểm thử trong phạm vi TKiet đã chốt; không tự thêm điều khiển tưới hay chức năng ngoài phạm vi.
+G0 v0.1 chọn **backend làm nơi tính kết quả quy tắc duy nhất**. MThuy giao tài liệu đặc tả, nguồn và ca đầu vào → kết quả mong đợi; TDat triển khai khi đã duyệt. DKhoa/QThang hiển thị cùng thông điệp và trạng thái do backend trả. Trước khi có quy tắc được duyệt, API trả `advice: null`; không tự thêm điều khiển tưới hay chức năng ngoài phạm vi.
 
 Mỗi quy tắc cần tối thiểu: **mã/phiên bản, mục đích, trường và đơn vị đầu vào, điều kiện dữ liệu hợp lệ/đủ mới, điều kiện kích hoạt, kết quả/câu chữ, mức ưu tiên, ca sát ranh giới, nguồn tham khảo hoặc người duyệt**. Ngưỡng cụ thể chỉ được đưa vào phiên bản dùng chung sau khi TKiet và các bên liên quan xác nhận; không sao chép số bất kỳ vào mã/giao diện trước khi kiểm chứng cho bối cảnh vườn ươm của nhóm.
 
@@ -35,9 +37,9 @@ Mỗi quy tắc cần tối thiểu: **mã/phiên bản, mục đích, trường
 
 | Nhóm ca | Dữ liệu/điều kiện cần có | Kết quả cần quan sát |
 | --- | --- | --- |
-| Số đo bình thường | Ba cảm biến hợp lệ, thời gian đủ mới | ESP32 gửi, backend lưu, web/mobile hiện cùng giá trị/đơn vị |
+| Số đo bình thường | Năm cảm biến hợp lệ, thời gian đủ mới | ESP32 gửi, backend lưu, web/mobile hiện cùng giá trị/đơn vị |
 | Lỗi một cảm biến | Một giá trị `null` kèm trạng thái lỗi, cảm biến khác hợp lệ | Không phát lời khuyên dựa trên giá trị lỗi; phần còn lại vẫn có thể hiển thị |
-| HD‑38 chưa hiệu chuẩn | Có số thô, `%` thiếu và trạng thái chưa hiệu chuẩn | Không gắn `%` cho số thô, không áp dụng quy tắc cần độ ẩm đất % |
+| HD‑38/TDS/pH chưa hiệu chuẩn | Có số thô, giá trị quy đổi `null` và trạng thái chưa hiệu chuẩn | Không gắn %, ppm hoặc pH cho số thô; không áp dụng quy tắc cần giá trị quy đổi |
 | Giá trị biên / `0` hợp lệ | Giá trị ngay dưới, bằng, ngay trên ngưỡng đã duyệt; `0` hợp lệ nếu phù hợp hợp đồng | Kết quả đúng chiều so sánh; phân biệt `0` với thiếu dữ liệu |
 | Dữ liệu cũ / mất Wi‑Fi | Thời điểm đo cũ, thiết bị chưa gửi mẫu mới | Web/mobile có nhãn cũ; không tính lại lời khuyên như mẫu mới |
 | Gửi lại / API lỗi | Cùng mẫu gửi lại, backend tạm thời không nhận | Không lưu trùng trái hợp đồng; phản hồi và trạng thái hiển thị rõ |
@@ -52,7 +54,7 @@ Mỗi quy tắc cần tối thiểu: **mã/phiên bản, mục đích, trường
 **MThuy thực hiện:**
 
 - Cùng TKiet xác định MVP cần những loại cảnh báo/lời khuyên nào, đâu là thông tin chỉ để theo dõi; thống nhất nơi xử lý quy tắc với TDat/DKhoa/QThang.
-- Cùng QTien/TVan/TDat rà đơn vị, trạng thái cảm biến, `null`, thời điểm đo/nhận, tiêu chí “dữ liệu cũ” và tình huống HD‑38 chưa hiệu chuẩn. Nêu rõ điều kiện **không được ra kết luận chăm sóc**.
+- Cùng QTien/TVan/TDat rà đơn vị, trạng thái cảm biến, `null`, thời điểm đo/nhận, tiêu chí “dữ liệu cũ” và tình huống HD‑38/TDS/pH chưa hiệu chuẩn. Nêu rõ điều kiện **không được ra kết luận chăm sóc**.
 - Soạn `docs/testing/` với mã ca thử, fixture đầu vào, kết quả mong đợi và chủ sở hữu lỗi; góp ý `docs/integration/test-matrix.md` của TKiet để phủ đường mạch → firmware → API → web/mobile.
 - Chốt với DKhoa/QThang cách đặt nhãn trạng thái và hiển thị “không đủ dữ liệu”; cung cấp fixture đủ để hai người làm giao diện độc lập.
 
@@ -65,7 +67,7 @@ Mỗi quy tắc cần tối thiểu: **mã/phiên bản, mục đích, trường
 
 - Thu thập căn cứ phù hợp cho cây ớt con trong điều kiện vườn ươm của nhóm; ghi nguồn, điều kiện áp dụng, độ chắc chắn và người duyệt cho từng ngưỡng/khuyến nghị. Đưa bản đề xuất cho TKiet xem trước khi coi là phiên bản chính thức.
 - Viết bảng quy tắc theo cấu trúc đã chốt: đầu vào hợp lệ, điều kiện kích hoạt, kết quả, thông điệp, thứ tự ưu tiên khi nhiều điều kiện cùng xảy ra, ranh giới số đo và trường hợp không đủ dữ liệu.
-- Cùng QTien thiết kế buổi đối chiếu HD‑38: điều kiện tham chiếu, số đọc thô, chiều biến thiên, cách ghi kết quả và giới hạn phép quy đổi. QTien triển khai tham số/mã hiệu chuẩn; MThuy xác nhận phương pháp và kiểm tra kết quả.
+- Cùng QTien thiết kế đối chiếu HD‑38, TDS và pH: mẫu tham chiếu, số đọc thô, cách ghi kết quả và giới hạn phép quy đổi. QTien triển khai tham số/mã hiệu chuẩn; MThuy xác nhận phương pháp và kiểm tra kết quả.
 
 **Đầu ra:** `docs/agronomy/` có quy tắc v0.1, bảng nguồn/giả định, ca ranh giới và biểu mẫu đối chiếu cảm biến.  
 **Đạt Phase 1 khi:** Người triển khai quy tắc có thể lấy cùng fixture và ra cùng kết quả mong đợi; mọi ngưỡng được dùng đều có nguồn và phạm vi áp dụng được TKiet xác nhận.
@@ -108,7 +110,7 @@ Mỗi quy tắc cần tối thiểu: **mã/phiên bản, mục đích, trường
 **MThuy thực hiện:**
 
 - Tổng hợp ma trận kiểm thử cuối: mã ca, điều kiện, fixture/thiết bị, kết quả, bằng chứng, phiên bản quy tắc/API/hiệu chuẩn và lỗi còn mở. Phân biệt ca đã thử trên mạch thật với ca chỉ thử bằng dữ liệu mẫu.
-- Bàn giao tài liệu quy tắc, nguồn/giả định, bảng đối chiếu HD‑38, fixture, biên bản kiểm thử và các giới hạn cho TKiet; cùng TDat/DKhoa/QThang xác nhận thông điệp cuối trong hệ thống.
+- Bàn giao tài liệu quy tắc, nguồn/giả định, bảng đối chiếu HD‑38/TDS/pH, fixture, biên bản kiểm thử và các giới hạn cho TKiet; cùng TDat/DKhoa/QThang xác nhận thông điệp cuối trong hệ thống.
 - Hỗ trợ kịch bản demo của TKiet bằng một mẫu hợp lệ và một mẫu không đủ dữ liệu, giải thích vì sao hệ thống hiển thị hoặc không hiển thị lời khuyên.
 
 **Đầu ra:** Báo cáo kiểm thử, quy tắc phiên bản cuối, bộ fixture, bằng chứng và danh sách hạn chế chưa giải quyết.  
@@ -118,7 +120,7 @@ Mỗi quy tắc cần tối thiểu: **mã/phiên bản, mục đích, trường
 
 - [ ] Mỗi quy tắc có mã/phiên bản, nguồn hoặc người duyệt, đầu vào, điều kiện dữ liệu hợp lệ, kết quả và ca ranh giới.
 - [ ] Nơi chạy quy tắc được TKiet chốt; TDat/DKhoa/QThang dùng cùng kết quả và câu chữ đã duyệt.
-- [ ] HD‑38 có số đọc thô, biên bản đối chiếu và giới hạn của phép quy đổi; QTien giữ mã hiệu chuẩn.
+- [ ] HD‑38/TDS/pH có số đọc thô, biên bản đối chiếu và giới hạn của phép quy đổi; QTien giữ mã hiệu chuẩn.
 - [ ] Fixture bao phủ bình thường, `0` hợp lệ, `null`, một cảm biến lỗi, chưa hiệu chuẩn, dữ liệu cũ, mất Wi‑Fi, API lỗi và gửi lại.
 - [ ] Mỗi ca kiểm thử có kết quả mong đợi/thực tế, bằng chứng, phiên bản và người chịu trách nhiệm xử lý lỗi.
 - [ ] Web/mobile không hiện lời khuyên dựa trên dữ liệu thiếu/lỗi/cũ trái hợp đồng; khác biệt giữa hai giao diện được ghi issue.

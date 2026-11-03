@@ -1,5 +1,7 @@
 # 04 — TDat: Backend, API và cơ sở dữ liệu
 
+**Phạm vi G0 v0.1:** backend nhận và trả đủ năm cảm biến theo `docs/contracts/sensor-reading.md` và `docs/contracts/api.md`. Backend là nơi duy nhất tính quy tắc sau khi MThuy bàn giao phiên bản được duyệt; trước đó `advice` là `null`. Hồ sơ chờ xác nhận tại `docs/integration/g0-handoff.md`.
+
 **Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT  
 **Người phụ trách chính:** TDat  
 **Trách nhiệm chính:** Xây dựng backend, API và cơ sở dữ liệu để nhận, kiểm tra, lưu trữ và cung cấp số đo cho web/mobile.  
@@ -23,7 +25,7 @@ Một backend nhận số đo ESP32 do TVan gửi, kiểm tra và lưu dữ li�
 
 ### ESP32 → backend
 
-Tại **Phase 0 (G0)**, TVan và TDat xác nhận một request mẫu cùng phản hồi thành công/lỗi. Tài liệu API phải ghi rõ đường dẫn, phương thức, kiểu dữ liệu, mã thiết bị, đơn vị, giá trị `null`, trạng thái từng cảm biến, quy tắc thời gian và cách nhận diện bản ghi gửi lại. Các trường `device_id`, `recorded_at`, `air_temperature_c`, `air_humidity_pct`, `soil_temperature_c`, `soil_moisture_raw`, `soil_moisture_pct`, `sensor_status` trong file 01 là **khung thảo luận**, chưa phải schema chính thức.
+Tại **Phase 0 (G0)**, TVan và TDat xác nhận request/response mẫu trong `docs/contracts/api.md`. Tài liệu này đề xuất đường dẫn, phương thức, kiểu dữ liệu, đơn vị, `null`, trạng thái của năm cảm biến, quy tắc thời gian và chống trùng theo `device_id` + `sample_id`. Chỉ coi phiên bản 0.1 là đã chốt sau khi các bên xác nhận trong hồ sơ G0.
 
 - Lưu riêng **thời điểm đo** theo hợp đồng (`recorded_at`, có thể thiếu nếu đồng hồ thiết bị chưa đáng tin) và **thời điểm server nhận** (`received_at`). Chốt với TVan cách xử lý trường hợp thiếu thời điểm đo; không tự biến thời điểm nhận thành thời điểm đo mà không ghi rõ.
 - Thống nhất một cách chống lưu trùng khi TVan gửi lại: mã mẫu hoặc khóa duy nhất được chốt ở G0, cùng phản hồi khi bản ghi đã nhận trước đó. Không dùng riêng giá trị cảm biến làm khóa trùng.
@@ -32,13 +34,13 @@ Tại **Phase 0 (G0)**, TVan và TDat xác nhận một request mẫu cùng ph�
 
 ### Backend → web/mobile
 
-TDat cung cấp cho DKhoa/QThang **response mẫu** ngay tại G0, trước khi CSDL hoàn chỉnh: một thiết bị chưa có bản ghi, số đo hợp lệ mới nhất, một cảm biến lỗi, HD‑38 chưa hiệu chuẩn, dữ liệu đã cũ và lỗi server. Chốt cách lấy dữ liệu mới nhất/lịch sử, thứ tự thời gian, giới hạn số bản ghi, đơn vị, mã lỗi và tiêu chí “cũ” để hai giao diện làm bằng mock.
+TDat cung cấp cho DKhoa/QThang **response mẫu** ngay tại G0, trước khi CSDL hoàn chỉnh: một thiết bị chưa có bản ghi, số đo hợp lệ mới nhất, một cảm biến lỗi, HD‑38/TDS/pH chưa hiệu chuẩn, dữ liệu đã cũ và lỗi server. Chốt cách lấy dữ liệu mới nhất/lịch sử, thứ tự thời gian, giới hạn số bản ghi, đơn vị, mã lỗi và tiêu chí “cũ” để hai giao diện làm bằng mock.
 
-**Danh sách API để thảo luận ở G0, không phải URL đã duyệt:** nhận số đo; lấy số đo mới nhất theo thiết bị; lấy lịch sử có giới hạn; lấy trạng thái thiết bị/cảnh báo nếu MVP cần. TDat chịu trách nhiệm công bố URL và ví dụ request/response cuối cùng trong `docs/contracts/api.md`.
+**Đường dẫn đề xuất G0 v0.1:** nhận số đo, lấy số đo mới nhất theo thiết bị và lấy lịch sử có giới hạn được ghi trong `docs/contracts/api.md`. TDat xác nhận đường dẫn và công bố base URL của môi trường thử trong README backend.
 
 ### Quy tắc chăm sóc
 
-MThuy bàn giao ngưỡng/điều kiện, giải thích và ca thử; TKiet cùng TDat/DKhoa/QThang/MThuy chốt **một nơi tính kết quả** (backend hoặc giao diện theo kiến trúc MVP). Nếu chọn backend, TDat triển khai quy tắc bằng phiên bản đã duyệt, chỉ áp dụng trên số đo hợp lệ, trả cả trạng thái “không đủ dữ liệu” khi cần và ghi rõ phiên bản quy tắc. Không tự đặt ngưỡng cho cây ớt hoặc biến trạng thái cảm biến lỗi thành lời khuyên chăm sóc.
+MThuy bàn giao ngưỡng/điều kiện, giải thích và ca thử; G0 v0.1 chọn **backend làm nơi tính kết quả duy nhất**. TDat chỉ triển khai quy tắc bằng phiên bản đã duyệt trên số đo hợp lệ và đủ mới; trước khi có phiên bản đó, API trả `advice: null`. Không tự đặt ngưỡng cho cây ớt hoặc biến trạng thái cảm biến lỗi thành lời khuyên chăm sóc.
 
 ## 3. Kế hoạch theo Phase
 
@@ -59,7 +61,7 @@ MThuy bàn giao ngưỡng/điều kiện, giải thích và ca thử; TKiet cùn
 **TDat thực hiện:**
 
 - Tạo cấu trúc `backend/`, cấu hình mẫu, lệnh chạy và migration/khởi tạo CSDL. Thiết kế bản ghi thiết bị và số đo với khóa/quan hệ, trạng thái cảm biến, thời điểm đo và thời điểm nhận; thêm chỉ mục phục vụ xem số đo mới nhất/lịch sử khi cần.
-- Nạp bộ fixture theo G0 gồm: chưa có dữ liệu, mẫu bình thường, cảm biến lỗi một phần, HD‑38 chưa hiệu chuẩn, bản ghi cũ và nhiều bản ghi theo thứ tự thời gian.
+- Nạp bộ fixture theo G0 gồm: chưa có dữ liệu, mẫu bình thường, cảm biến lỗi một phần, HD‑38/TDS/pH chưa hiệu chuẩn, bản ghi cũ và nhiều bản ghi theo thứ tự thời gian.
 - Trả response mẫu theo hợp đồng qua backend thử hoặc tệp fixture để DKhoa/QThang có thể phát triển độc lập; giữ schema giống API thật dự định triển khai.
 
 **Đầu ra:** Backend khởi chạy được, schema/migration tái tạo được, fixture và cách reset dữ liệu demo.  

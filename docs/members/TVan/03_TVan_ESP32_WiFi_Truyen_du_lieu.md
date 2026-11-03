@@ -1,5 +1,7 @@
 # 03 — TVan: Chương trình chính ESP32, Wi‑Fi và truyền dữ liệu
 
+**Phạm vi G0 v0.1:** đóng gói một mẫu gồm năm cảm biến theo `docs/contracts/sensor-reading.md` và gửi theo `docs/contracts/api.md`; tạo `sample_id` ổn định khi thử lại. Hồ sơ đang chờ xác nhận tại `docs/integration/g0-handoff.md`.
+
 **Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT  
 **Người phụ trách chính:** TVan  
 **Trách nhiệm chính:** Xây dựng chương trình chính ESP32, kết nối Wi‑Fi, đóng gói payload và gửi dữ liệu đến backend.  
@@ -23,13 +25,13 @@ Một chương trình chính cho ESP32 nhận mẫu đo từ module của QTien,
 
 ### QTien → TVan: module cảm biến
 
-Sử dụng `docs/contracts/sensor-module.md` sau mốc **G0**. TVan cần biết tên hàm khởi tạo/lấy mẫu, kiểu kết quả, thời gian chờ và trạng thái riêng của DHT22, HD‑38, DS18B20. QTien trả về **giá trị và trạng thái của lần đọc**; TVan điều khiển khi nào gọi, gắn `device_id` và `recorded_at` theo quy ước đã duyệt, rồi chuyển sang payload gửi đi. Một cảm biến lỗi không tự động xóa dữ liệu hợp lệ của cảm biến khác.
+Sử dụng `docs/contracts/sensor-module.md` sau mốc **G0**. TVan cần biết tên hàm khởi tạo/lấy mẫu, kiểu kết quả, thời gian chờ và trạng thái riêng của DHT22, HD‑38, DS18B20, TDS Meter V1.0, PH‑4502C. QTien trả về **giá trị và trạng thái của lần đọc**; TVan điều khiển khi nào gọi, gắn `device_id` và `recorded_at` theo quy ước đã duyệt, rồi chuyển sang payload gửi đi. Một cảm biến lỗi không tự động xóa dữ liệu hợp lệ của cảm biến khác.
 
 ### TVan → TDat: API nhận số đo
 
 TDat soạn chi tiết `docs/contracts/api.md` và chốt với TVan, TKiet. G0 phải có: địa chỉ/đường dẫn API trong môi trường thử, phương thức gửi, cấu trúc JSON, kiểu dữ liệu, đơn vị, quy ước `null`/trạng thái lỗi, cách xác định thời gian đo và thời gian server nhận, phản hồi thành công/thất bại, xử lý bản ghi gửi lại và cách nhận diện thiết bị. Nếu có khóa truy cập, thống nhất cách cấu hình riêng; không đặt thông tin bí mật thật trong mã nguồn hoặc log.
 
-Các trường nêu ở file 01 (`device_id`, `recorded_at`, `air_temperature_c`, `air_humidity_pct`, `soil_temperature_c`, `soil_moisture_raw`, `soil_moisture_pct`, `sensor_status`) là **khung để thảo luận tại G0**. TVan không tự coi đó là schema chính thức. Chỉ chuyển `soil_moisture_pct` thành số khi QTien đã hiệu chuẩn; giá trị thiếu/lỗi được xuất theo hợp đồng, không tự thay bằng `0`. Nếu đồng hồ ESP32 chưa có thời gian đáng tin cậy, làm theo quy tắc G0 với TDat, không tự gắn thời điểm hiện tại giả.
+Schema đề xuất G0 v0.1 nằm trong `docs/contracts/sensor-reading.md`. TVan không tự quy đổi số thô HD‑38/TDS/pH; các trường %, ppm, pH chỉ có giá trị khi QTien đã hiệu chuẩn. Giá trị thiếu/lỗi là `null` kèm trạng thái, không thay bằng `0`. Nếu đồng hồ ESP32 chưa đáng tin cậy, gửi `recorded_at: null`; TDat ghi thời điểm nhận.
 
 **Cách làm song song:** TVan dùng module giả của QTien để lập lịch, tạo JSON và gửi tới máy nhận giả; TDat dùng cùng payload mẫu để dựng endpoint. Khi module cảm biến và API thật sẵn sàng, thay adapter/địa chỉ thử theo hợp đồng, không viết lại luồng dữ liệu.
 
