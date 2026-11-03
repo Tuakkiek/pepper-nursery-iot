@@ -36,7 +36,7 @@ Mỗi thư mục thành viên chứa file Markdown mô tả trách nhiệm, đ�
 
 | Thành viên | Phụ trách | Branch |
 | --- | --- | --- |
-| TKiet | Kiến trúc, phần cứng và tích hợp | Không tạo branch riêng |
+| TKiet | Kiến trúc, phần cứng và tích hợp | `TKiet` |
 | QTien | ESP32, cảm biến và hiệu chuẩn | `QTien` |
 | TVan | ESP32, Wi‑Fi và truyền dữ liệu | `TVan` |
 | TDat | Backend, API và cơ sở dữ liệu | `TDat` |
