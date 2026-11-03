@@ -1,5 +1,7 @@
 # 05 — DKhoa: Web dashboard
 
+**Phạm vi G0 v0.1:** dashboard hiển thị đủ năm cảm biến theo `docs/contracts/api.md` và fixture trong `docs/contracts/fixtures/`; pH/TDS là phép đo mẫu nước/dung dịch. Chỉ hiển thị kết quả quy tắc do backend trả sau khi MThuy duyệt.
+
 **Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT  
 **Người phụ trách chính:** DKhoa  
 **Trách nhiệm chính:** Xây dựng web dashboard để hiển thị số đo, lịch sử, trạng thái và cảnh báo theo API đã thống nhất.  
@@ -7,7 +9,7 @@
 
 ## 1. Kết quả cần bàn giao
 
-Một dashboard web để xem tình trạng thiết bị và các số đo của vườn ươm: **nhiệt độ không khí, độ ẩm không khí, nhiệt độ đất, độ ẩm đất**, thời điểm đo, lịch sử và trạng thái/cảnh báo theo phạm vi MVP đã chốt. Khi dữ liệu thiếu, cảm biến lỗi, chưa hiệu chuẩn, dữ liệu cũ hoặc server không truy cập được, màn hình phải diễn đạt đúng tình trạng thay vì trình bày số đo như còn mới và hợp lệ.
+Một dashboard web để xem **nhiệt độ/độ ẩm không khí, nhiệt độ/độ ẩm đất, TDS và pH mẫu nước/dung dịch**, thời điểm đo, lịch sử và trạng thái/cảnh báo. Khi dữ liệu thiếu, cảm biến lỗi, chưa hiệu chuẩn, dữ liệu cũ hoặc server không truy cập được, màn hình phải diễn đạt đúng tình trạng.
 
 ### Ranh giới sở hữu
 
@@ -21,7 +23,7 @@ Một dashboard web để xem tình trạng thiết bị và các số đo của
 
 ## 2. Hợp đồng đầu vào và cách làm song song
 
-Tại **Phase 0 (G0)**, DKhoa nhận từ TDat response mẫu và quy ước truy vấn: số đo mới nhất, lịch sử có giới hạn, thiết bị chưa có dữ liệu, dữ liệu cũ, một cảm biến lỗi, HD‑38 chưa hiệu chuẩn, cảnh báo (nếu có), lỗi server. DKhoa và QThang thống nhất **ý nghĩa trạng thái và đơn vị** để hai giao diện không diễn giải trái nhau; mỗi người vẫn sở hữu mã giao diện riêng.
+Tại **Phase 0 (G0)**, DKhoa nhận từ TDat response mẫu và quy ước truy vấn: số đo mới nhất, lịch sử có giới hạn, thiết bị chưa có dữ liệu, dữ liệu cũ, một cảm biến lỗi, HD‑38/TDS/pH chưa hiệu chuẩn, cảnh báo (nếu có), lỗi server. DKhoa và QThang thống nhất **ý nghĩa trạng thái và đơn vị** để hai giao diện không diễn giải trái nhau; mỗi người vẫn sở hữu mã giao diện riêng.
 
 | Trạng thái đầu vào | Web cần thể hiện |
 | --- | --- |
@@ -29,11 +31,11 @@ Tại **Phase 0 (G0)**, DKhoa nhận từ TDat response mẫu và quy ước tru
 | Chưa có bản ghi cho thiết bị | Thông báo chưa có dữ liệu, không vẽ số `0` hoặc biểu đồ giả |
 | Mẫu hợp lệ, mới | Hiện giá trị, đơn vị, trạng thái và thời điểm đo/nhận theo quy tắc G0 |
 | Chỉ một cảm biến lỗi | Giữ số đo hợp lệ của các cảm biến khác; ô bị lỗi ghi “Không có số đo” và lý do nếu API cung cấp |
-| HD‑38 chưa hiệu chuẩn | Có thể hiện số đọc thô nếu nhóm quyết định; không gắn `%` cho số thô và không coi đó là độ ẩm đất % |
+| HD‑38/TDS/pH chưa hiệu chuẩn | Có thể hiện số thô với nhãn rõ; không gắn %, ppm hoặc pH cho số thô |
 | Dữ liệu cũ / thiết bị mất liên lạc | Gắn nhãn “Dữ liệu cũ”, cho biết lần cập nhật cuối; không trình bày như trạng thái hiện tại |
 | Số đo hợp lệ bằng `0` | Hiện `0` đúng đơn vị; khác hoàn toàn với `null` hoặc trạng thái lỗi |
 
-**Giao diện dữ liệu G0 là nguồn thống nhất.** Các trường nêu ở file 01 (`device_id`, `recorded_at`, `air_temperature_c`, `air_humidity_pct`, `soil_temperature_c`, `soil_moisture_raw`, `soil_moisture_pct`, `sensor_status`) chỉ là khung thảo luận. Chốt với TDat cách API biểu diễn trạng thái từng cảm biến, thời điểm đo và thời điểm server nhận, thứ tự/trang lịch sử, tiêu chí dữ liệu cũ và tần suất làm mới. Định dạng ngày giờ hiển thị phải rõ múi giờ và không biến thời điểm server nhận thành thời điểm đo.
+**Giao diện dữ liệu đề xuất G0 v0.1:** `docs/contracts/api.md` và `docs/contracts/sensor-reading.md` quy định trạng thái của năm cảm biến, thời điểm đo/nhận, lịch sử và tiêu chí dữ liệu cũ. DKhoa xác nhận cùng TDat/QThang; định dạng ngày giờ hiển thị phải rõ múi giờ và không biến thời điểm server nhận thành thời điểm đo.
 
 **Cách làm song song:** Dựng giao diện bằng bộ response giả đúng G0 và đặt việc gọi dữ liệu sau một lớp adapter/API riêng. TDat có thể hoàn thiện backend, TVan có thể hoàn thiện ESP32 mà DKhoa không phải chờ. Khi API thật sẵn sàng, đổi nguồn dữ liệu trong adapter và đối chiếu các trạng thái đã thử bằng fixture.
 
@@ -77,7 +79,7 @@ Tại **Phase 0 (G0)**, DKhoa nhận từ TDat response mẫu và quy ước tru
 **DKhoa thực hiện:**
 
 - Cùng TDat gọi API thật và đối chiếu giá trị, đơn vị, thời điểm, thứ tự lịch sử trên web với response; cùng TKiet kiểm tra một mẫu từ cảm biến thật qua ESP32 tới màn hình.
-- Thử các ca: chưa có thiết bị/bản ghi, một cảm biến lỗi, HD‑38 chưa hiệu chuẩn, mẫu cũ, API mất kết nối, gửi bản ghi mới sau khi Wi‑Fi hồi phục. Ghi issue có response và ảnh màn hình khi kết quả sai.
+- Thử các ca: chưa có thiết bị/bản ghi, một cảm biến lỗi, HD‑38/TDS/pH chưa hiệu chuẩn, mẫu cũ, API mất kết nối, gửi bản ghi mới sau khi Wi‑Fi hồi phục. Ghi issue có response và ảnh màn hình khi kết quả sai.
 - Cùng QThang so sánh cùng một bản ghi trên web/mobile để phát hiện khác biệt về đơn vị, nhãn lỗi hoặc thời điểm.
 
 **Đầu ra:** Biên bản tích hợp web, ảnh các trạng thái và danh sách issue có người nhận.  
@@ -109,7 +111,7 @@ Tại **Phase 0 (G0)**, DKhoa nhận từ TDat response mẫu và quy ước tru
 
 - [ ] Giao diện và lớp API nằm trong `web/`, có hướng dẫn chạy và cấu hình API.
 - [ ] Có fixture cho bình thường, chưa có dữ liệu, lỗi một cảm biến, chưa hiệu chuẩn, dữ liệu cũ và lỗi server.
-- [ ] Số đo `0` hợp lệ khác `null`/lỗi; số đọc thô HD‑38 không bị gắn nhãn `%`.
+- [ ] Số đo `0` hợp lệ khác `null`/lỗi; số đọc thô HD‑38/TDS/pH không bị gắn nhãn %, ppm hoặc pH.
 - [ ] Thời điểm đo và thời điểm nhận được diễn giải đúng hợp đồng; dữ liệu cũ có nhãn rõ.
 - [ ] Lịch sử đúng thứ tự/giới hạn, không biến khoảng thiếu dữ liệu thành đường đo liên tục.
 - [ ] Không tự đặt quy tắc chăm sóc; nội dung/nguồn kết quả đã được MThuy và TKiet xác nhận.

@@ -1,5 +1,7 @@
 # 01 — TKiet: Tích hợp hệ thống và phần cứng
 
+**Phạm vi G0 v0.1:** MVP dùng năm cảm biến DHT22, HD‑38, DS18B20, TDS Meter V1.0 và PH‑4502C. Bộ tài liệu nguồn nằm tại `docs/architecture/mvp-scope.md`, `docs/hardware/pin-map.md`, `docs/contracts/` và `docs/integration/g0-handoff.md`. Hồ sơ đang chờ các thành viên xác nhận và kiểm tra mạch thật.
+
 **Người phụ trách chính:** TKiet  
 **Trách nhiệm chính:** Điều phối kiến trúc, phần cứng, kết nối cảm biến, tích hợp các module và kiểm thử đầu cuối của hệ thống.
 
@@ -8,8 +10,8 @@
 | Người trong nhóm | Phần việc chính | Người chịu trách nhiệm cuối cùng |
 | --- | --- | --- |
 | TKiet | Kiến trúc, tích hợp, toàn bộ phần cứng và kết nối cảm biến | TKiet |
-| QTien | Firmware ESP32 A: đọc cảm biến, kiểm tra và hiệu chuẩn số đo | QTien |
-| TVan | Firmware ESP32 B: chương trình chính, Wi‑Fi, đóng gói và gửi dữ liệu | TVan |
+| QTien | Module đọc năm cảm biến trên ESP32, kiểm tra và hiệu chuẩn số đo | QTien |
+| TVan | Chương trình chính trên cùng ESP32, Wi‑Fi, đóng gói và gửi dữ liệu | TVan |
 | TDat | Backend, API, cơ sở dữ liệu | TDat |
 | DKhoa | Web dashboard | DKhoa |
 | QThang | Ứng dụng mobile | QThang |
@@ -18,9 +20,9 @@
 
 ## 2. Phạm vi TKiet trực tiếp làm
 
-- Thiết kế sơ đồ luồng dữ liệu: DHT22, HD‑38, DS18B20 → ESP32 → backend/CSDL → web và mobile; thống nhất nơi áp dụng quy tắc chăm sóc cùng MThuy.
+- Thiết kế sơ đồ luồng dữ liệu: DHT22, HD‑38, DS18B20, TDS Meter V1.0, PH‑4502C → ESP32 → backend/CSDL → web và mobile; thống nhất nơi áp dụng quy tắc chăm sóc cùng MThuy.
 - Lập kế hoạch theo Phase, giao đầu ra, tổ chức các mốc chốt giao diện và kiểm tra việc bàn giao.
-- Chuẩn bị ESP32 DevKitC/ESP‑32D, mạch mở rộng 30P và ba cảm biến; chọn GPIO phù hợp với mạch thực tế, đấu nguồn/GND/dây tín hiệu, cố định và bảo vệ mạch trong môi trường vườn ươm.
+- Chuẩn bị ESP32 DevKit V1 30 chân, mạch mở rộng 30P và năm cảm biến; đối chiếu GPIO/nguồn theo `docs/hardware/pin-map.md` với mạch thực tế, cố định và bảo vệ mạch trong môi trường vườn ươm.
 - Kiểm tra độc lập nguồn, dây, từng cảm biến và toàn bộ bộ mạch; ghi nhận hiện tượng, kết quả, ảnh và cách tái hiện lỗi để QTien/TVan dùng cùng một cấu hình.
 - Tích hợp các phần đã được chủ sở hữu bàn giao, chạy kiểm thử đầu cuối, theo dõi lỗi liên nhóm và chuẩn bị kịch bản demo.
 
@@ -44,7 +46,7 @@
 | `docs/contracts/sensor-module.md` | Chốt điểm nối giữa hai người viết firmware | QTien, TVan | QTien trả về số đo/trạng thái; TVan gọi được mà không cần sửa mã đọc cảm biến |
 | `docs/integration/test-matrix.md` | Ma trận kiểm thử mạch → firmware → API → giao diện | QTien, TVan, TDat, DKhoa, QThang và MThuy | Mỗi đường dữ liệu và tình huống lỗi có người kiểm tra |
 
-**Khung dữ liệu để thảo luận ở G0 (chưa coi là schema đã duyệt):** `device_id`, `recorded_at` (thời điểm đo, quy ước múi giờ), `air_temperature_c`, `air_humidity_pct`, `soil_temperature_c`, `soil_moisture_raw`, `soil_moisture_pct`, `sensor_status`. HD‑38 có số đọc thô; chỉ dùng `%` khi đã thống nhất cách hiệu chuẩn và phạm vi quy đổi. Khi đo lỗi/chưa hiệu chuẩn, thống nhất giá trị `null` và trạng thái tương ứng; không tự thay bằng `0`. TDat chốt JSON/API cuối cùng sau khi QTien, TVan và bên giao diện xác nhận.
+**Schema đề xuất G0 v0.1, đang chờ xác nhận:** `docs/contracts/sensor-reading.md` và `docs/contracts/api.md` quy định toàn bộ trường, đơn vị và trạng thái của năm cảm biến. HD‑38, TDS và pH chỉ có giá trị quy đổi sau hiệu chuẩn; dữ liệu lỗi/chưa hiệu chuẩn dùng `null` và trạng thái tương ứng, không thay bằng `0`. TDat xác nhận JSON/API cùng QTien, TVan và bên giao diện.
 
 ## 4. Kế hoạch theo Phase
 
@@ -52,8 +54,8 @@
 
 **TKiet thực hiện:**
 
-- Liệt kê mục tiêu MVP và luồng demo cần chứng minh: nhận số đo từ ba cảm biến qua ESP32, lưu/truy xuất dữ liệu, hiển thị trên web/mobile và kiểm tra quy tắc chăm sóc theo phạm vi nhóm chốt.
-- Kiểm kê đúng linh kiện thực tế; đặt mã cho thiết bị và phiên bản mạch; phác sơ đồ nối ESP32, mạch 30P, DHT22, HD‑38, DS18B20. Không ấn định GPIO trên giấy trước khi đối chiếu chân khả dụng và mạch thực.
+- Liệt kê mục tiêu MVP và luồng demo cần chứng minh: nhận số đo từ năm cảm biến qua ESP32, lưu/truy xuất dữ liệu, hiển thị trên web/mobile và kiểm tra quy tắc chăm sóc theo phạm vi nhóm chốt.
+- Kiểm kê đúng linh kiện thực tế; đặt mã cho thiết bị và phiên bản mạch; đối chiếu `docs/hardware/wiring_diagram.docx` và `docs/hardware/pin-map.md` với ESP32, mạch 30P và năm cảm biến. Không coi chân/nguồn trên giấy là đã kiểm chứng trước khi đo mạch thực.
 - Chủ trì buổi chốt `pin-map.md`, hợp đồng module firmware, mẫu JSON/API, đơn vị đo, trạng thái lỗi và tiêu chí dữ liệu cũ/mất kết nối.
 - Tạo bảng việc gồm chủ sở hữu, đường dẫn đầu ra, phụ thuộc, người review và mốc bàn giao cho QTien, TVan, TDat, DKhoa, QThang và MThuy.
 
@@ -69,7 +71,7 @@
 - Chụp ảnh mạch thực, cập nhật pin map theo đúng cách đã đấu, lập checklist lắp lại và biên bản kiểm tra nguồn/dây.
 
 **Đầu ra:** Bộ mạch dùng chung, sơ đồ dây đúng với mạch thật, ảnh có nhãn, bảng GPIO/nguồn/GND và biên bản test từng cảm biến.  
-**Đạt Phase 1 khi:** QTien và TVan có thể dùng tài liệu để kết nối cùng cấu hình, và cả ba đường cảm biến có kết quả thử hoặc có lỗi được mô tả, gán người xử lý rõ ràng.
+**Đạt Phase 1 khi:** QTien và TVan có thể dùng tài liệu để kết nối cùng cấu hình, và cả năm đường cảm biến có kết quả thử hoặc có lỗi được mô tả, gán người xử lý rõ ràng.
 
 ### Phase 2 — Theo dõi phát triển song song, chuẩn bị tích hợp
 
