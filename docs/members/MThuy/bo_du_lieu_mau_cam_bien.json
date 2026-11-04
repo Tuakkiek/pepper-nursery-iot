@@ -1,0 +1,974 @@
+{
+  "metadata": {
+    "dataset_version": "1.0",
+    "project": "pepper-nursery-iot",
+    "author": "MThuy (Agronomy & Testing QA)",
+    "target_crop": "Cây con ớt cay (Capsicum annuum L.) giai đoạn vườn ươm (0-35 ngày sau gieo)",
+    "created_at": "2026-11-04T10:30:00Z",
+    "notes": "Bộ dữ liệu mô phỏng chuẩn nông học theo docs/agronomy/ và hợp đồng sensor-reading.md v0.1"
+  },
+  "scenarios": [
+    {
+      "scenario_id": "SCENARIO_01_OPTIMAL_DAY",
+      "title": "Môi trường ban ngày lý tưởng cho ớt con",
+      "description": "Nắng ấm nhẹ, nhiệt độ 26.5°C, ẩm không khí 68%, ẩm đất 72%, TDS 320 ppm, pH 6.3.",
+      "expected_advice_status": "optimal",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-opt-day-001",
+        "recorded_at": "2026-11-04T09:30:00Z",
+        "air_temperature_c": 26.5,
+        "air_humidity_pct": 68.0,
+        "soil_temperature_c": 25.0,
+        "soil_moisture_raw": 1950,
+        "soil_moisture_pct": 72.0,
+        "water_tds_adc_raw": 1420,
+        "water_tds_ppm": 320.0,
+        "water_ph_adc_raw": 1910,
+        "water_ph": 6.3,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "optimal",
+        "priority": 5,
+        "code": "ENV_OPTIMAL",
+        "message": "Môi trường vườn ươm ớt con đang ở điều kiện sinh trưởng lý tưởng nhất!",
+        "suggested_action": "Duy trì chế độ thông gió và lịch tưới ổn định hiện tại (1-2 lần/ngày)."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_02_OPTIMAL_NIGHT",
+      "title": "Môi trường ban đêm lý tưởng cho ớt con",
+      "description": "Đêm mát mẻ 21.5°C, ẩm không khí tăng nhẹ 74%, ẩm đất ổn định 70%, rễ 22.8°C.",
+      "expected_advice_status": "optimal",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-opt-night-002",
+        "recorded_at": "2026-11-04T22:00:00Z",
+        "air_temperature_c": 21.5,
+        "air_humidity_pct": 74.0,
+        "soil_temperature_c": 22.8,
+        "soil_moisture_raw": 1980,
+        "soil_moisture_pct": 70.0,
+        "water_tds_adc_raw": 1390,
+        "water_tds_ppm": 280.0,
+        "water_ph_adc_raw": 1920,
+        "water_ph": 6.4,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "optimal",
+        "priority": 5,
+        "code": "ENV_OPTIMAL",
+        "message": "Nhiệt độ và độ ẩm ban đêm ổn định lý tưởng cho cây con nghỉ ngơi.",
+        "suggested_action": "Giữ nhà màng kín gió lạnh, không tưới nước vào ban đêm."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_03_SOIL_DROUGHT",
+      "title": "Giá thể đất bị khô hạn (Cần tưới nước gấp)",
+      "description": "Độ ẩm đất giảm sâu xuống 48.0% (< 55% mức báo động). Cần kích hoạt quy tắc tưới giữ ẩm.",
+      "expected_advice_status": "critical",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-drought-003",
+        "recorded_at": "2026-11-04T14:15:00Z",
+        "air_temperature_c": 31.0,
+        "air_humidity_pct": 52.0,
+        "soil_temperature_c": 29.0,
+        "soil_moisture_raw": 2350,
+        "soil_moisture_pct": 48.0,
+        "water_tds_adc_raw": 1410,
+        "water_tds_ppm": 310.0,
+        "water_ph_adc_raw": 1900,
+        "water_ph": 6.2,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "critical",
+        "priority": 2,
+        "code": "SOIL_MOIST_CRIT_LOW",
+        "message": "Khẩn cấp: Bầu ươm đất bị khô kiệt nghiêm trọng (dưới 55%), cây con có nguy cơ héo chết rũ!",
+        "suggested_action": "Tưới bù ẩm ngay lập tức bằng vòi phun sương mịn đều khắp khay bầu."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_04_SOIL_OVERWATERED",
+      "title": "Giá thể đất bị úng ngập / quá ẩm",
+      "description": "Độ ẩm đất 89.0% (> 85% mức nguy hiểm). Nguy cơ nghẹt rễ, lở cổ rễ cây ớt non.",
+      "expected_advice_status": "critical",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-overwet-004",
+        "recorded_at": "2026-11-04T16:00:00Z",
+        "air_temperature_c": 24.0,
+        "air_humidity_pct": 82.0,
+        "soil_temperature_c": 23.5,
+        "soil_moisture_raw": 1650,
+        "soil_moisture_pct": 89.0,
+        "water_tds_adc_raw": 1420,
+        "water_tds_ppm": 330.0,
+        "water_ph_adc_raw": 1910,
+        "water_ph": 6.5,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "critical",
+        "priority": 2,
+        "code": "SOIL_MOIST_CRIT_HIGH",
+        "message": "Khẩn cấp: Giá thể đất đang bị ngập úng (trên 85%), rễ cây bị nghẹt oxy, nguy cơ thối lở cổ rễ!",
+        "suggested_action": "Ngừng tưới nước ngay lập tức! Kê vỉ xốp lên giàn cao 20cm và tăng tối đa thông gió đáy bầu."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_05_HEATWAVE_DRY",
+      "title": "Nhiệt độ không khí quá cao & khô hanh",
+      "description": "Nhiệt độ 34.5°C (> 32°C), ẩm khí 44.0% (< 50%). Cây con thoát hơi nước mạnh, nguy cơ sốc nhiệt.",
+      "expected_advice_status": "warning",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-heat-005",
+        "recorded_at": "2026-11-04T12:45:00Z",
+        "air_temperature_c": 34.5,
+        "air_humidity_pct": 44.0,
+        "soil_temperature_c": 31.5,
+        "soil_moisture_raw": 2100,
+        "soil_moisture_pct": 60.0,
+        "water_tds_adc_raw": 1450,
+        "water_tds_ppm": 350.0,
+        "water_ph_adc_raw": 1905,
+        "water_ph": 6.3,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "critical",
+        "priority": 2,
+        "code": "AIR_TEMP_CRIT_HIGH",
+        "message": "Cảnh báo nguy hiểm: Nhiệt độ không khí vượt quá 32°C kết hợp khô hanh, nguy cơ cháy lá non!",
+        "suggested_action": "Kéo lưới lan che 70% nắng, bật hệ thống phun sương mái và làm mát nền nhà màng."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_06_COLD_DAMP_FOG",
+      "title": "Thời tiết lạnh và ẩm ướt sáng sớm",
+      "description": "Nhiệt độ 15.5°C (< 18°C), ẩm không khí 92.0% (> 80%). Nguy cơ bùng phát nấm sương mai.",
+      "expected_advice_status": "warning",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-cold-006",
+        "recorded_at": "2026-11-04T05:30:00Z",
+        "air_temperature_c": 15.5,
+        "air_humidity_pct": 92.0,
+        "soil_temperature_c": 16.5,
+        "soil_moisture_raw": 1850,
+        "soil_moisture_pct": 78.0,
+        "water_tds_adc_raw": 1380,
+        "water_tds_ppm": 270.0,
+        "water_ph_adc_raw": 1915,
+        "water_ph": 6.4,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "warning",
+        "priority": 3,
+        "code": "AIR_HUM_CRIT_HIGH",
+        "message": "Ẩm độ không khí quá cao (>85%) kết hợp lạnh ẩm, điều kiện bùng phát nấm sương mai.",
+        "suggested_action": "Mở cửa thông gió đối lưu, ngừng phun sương, rắc vôi bột lối đi để sát trùng."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_07_SALINE_HIGH_TDS",
+      "title": "Nước tưới nhiễm mặn / nồng độ phân quá cao",
+      "description": "TDS nước tưới đạt 980 ppm (> 850 ppm). Nguy cơ cháy đầu rễ và ngộ độc muối cây con.",
+      "expected_advice_status": "critical",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-tds-high-007",
+        "recorded_at": "2026-11-04T10:00:00Z",
+        "air_temperature_c": 27.0,
+        "air_humidity_pct": 65.0,
+        "soil_temperature_c": 25.5,
+        "soil_moisture_raw": 1900,
+        "soil_moisture_pct": 74.0,
+        "water_tds_adc_raw": 2250,
+        "water_tds_ppm": 980.0,
+        "water_ph_adc_raw": 1920,
+        "water_ph": 6.6,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "critical",
+        "priority": 2,
+        "code": "WATER_TDS_CRIT_HIGH",
+        "message": "Khẩn cấp: Nước tưới nhiễm mặn/nồng độ phân quá cao (>850 ppm), nguy cơ gây cháy xót toàn bộ rễ con!",
+        "suggested_action": "Tuyệt đối không tưới dung dịch này! Xả nước sạch rửa trôi muối trong giá thể và đổi nguồn nước tưới."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_08_ACIDIC_WATER",
+      "title": "Nước tưới bị nhiễm phèn chua nặng",
+      "description": "pH đo được là 4.8 (< 5.3). Cần xử lý nâng pH trước khi tưới cây ớt non.",
+      "expected_advice_status": "warning",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-ph-acid-008",
+        "recorded_at": "2026-11-04T10:30:00Z",
+        "air_temperature_c": 26.8,
+        "air_humidity_pct": 67.0,
+        "soil_temperature_c": 25.2,
+        "soil_moisture_raw": 1920,
+        "soil_moisture_pct": 73.0,
+        "water_tds_adc_raw": 1400,
+        "water_tds_ppm": 300.0,
+        "water_ph_adc_raw": 1620,
+        "water_ph": 4.8,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "critical",
+        "priority": 2,
+        "code": "WATER_PH_CRIT_LOW",
+        "message": "Khẩn cấp: Nước tưới bị nhiễm phèn chua nặng (pH < 5.3), làm cháy cụt đầu rễ con cây ớt!",
+        "suggested_action": "Không tưới trực tiếp! Dùng nước vôi trong pha loãng nâng pH lên 6.0 - 6.5 trước khi sử dụng."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_09_ALKALINE_WATER",
+      "title": "Nước tưới có độ kiềm cao",
+      "description": "pH đo được là 7.9 (> 7.5). Nước kiềm cản trở hấp thu vi lượng như sắt, kẽm.",
+      "expected_advice_status": "warning",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-ph-alk-009",
+        "recorded_at": "2026-11-04T11:00:00Z",
+        "air_temperature_c": 27.5,
+        "air_humidity_pct": 64.0,
+        "soil_temperature_c": 25.8,
+        "soil_moisture_raw": 1930,
+        "soil_moisture_pct": 72.5,
+        "water_tds_adc_raw": 1480,
+        "water_tds_ppm": 360.0,
+        "water_ph_adc_raw": 2180,
+        "water_ph": 7.9,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "critical",
+        "priority": 2,
+        "code": "WATER_PH_CRIT_HIGH",
+        "message": "Cảnh báo cao: Nước tưới có độ kiềm vôi cao (pH > 7.5), làm kết tủa vi lượng sắt khiến lá non bị vàng trắng!",
+        "suggested_action": "Dùng axit citric hữu cơ pha loãng vào bể chứa để hạ pH về dải tối ưu 6.0 - 6.5."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_10_BOUNDARY_LOWER_SOIL",
+      "title": "Giá trị biên sát ngưỡng cảnh báo khô (55.0%)",
+      "description": "Độ ẩm đất đúng bằng 55.0% - kiểm tra chiều so sánh điều kiện biên của backend.",
+      "expected_advice_status": "optimal",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-bound-soil-010",
+        "recorded_at": "2026-11-04T15:00:00Z",
+        "air_temperature_c": 28.0,
+        "air_humidity_pct": 60.0,
+        "soil_temperature_c": 26.5,
+        "soil_moisture_raw": 2220,
+        "soil_moisture_pct": 55.0,
+        "water_tds_adc_raw": 1410,
+        "water_tds_ppm": 310.0,
+        "water_ph_adc_raw": 1910,
+        "water_ph": 6.3,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "warning",
+        "priority": 4,
+        "code": "SOIL_MOIST_WARN_LOW",
+        "message": "Bầu ươm bắt đầu khô chạm ngưỡng cảnh báo (55.0%).",
+        "suggested_action": "Lên lịch tưới bổ sung nước sạch bằng ô doa lỗ mịn trong vòng 1-2 giờ tới."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_11_PARTIAL_DHT22_ERROR",
+      "title": "Cảm biến DHT22 bị mất kết nối / hỏng (read_error)",
+      "description": "Nhiệt độ/độ ẩm không khí là null. Backend trả advice: null, không được đoán tình trạng cây.",
+      "expected_advice_status": "insufficient_data",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-err-dht22-011",
+        "recorded_at": "2026-11-04T15:30:00Z",
+        "air_temperature_c": null,
+        "air_humidity_pct": null,
+        "soil_temperature_c": 26.2,
+        "soil_moisture_raw": 1950,
+        "soil_moisture_pct": 71.0,
+        "water_tds_adc_raw": 1420,
+        "water_tds_ppm": 320.0,
+        "water_ph_adc_raw": 1910,
+        "water_ph": 6.4,
+        "sensor_status": {
+          "dht22": "read_error",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "insufficient_data",
+        "priority": 1,
+        "code": "ERR_INSUFFICIENT_DATA",
+        "message": "Cảm biến DHT22 bị mất kết nối (read_error), không đủ dữ liệu đánh giá.",
+        "suggested_action": "Kiểm tra giắc cắm tín hiệu và nguồn 3.3V của cảm biến DHT22 trên mạch ESP32."
+      }
+    },
+    {
+      "scenario_id": "SCENARIO_12_UNCALIBRATED_SENSORS",
+      "title": "Cảm biến đất và nước chưa hiệu chuẩn (not_calibrated)",
+      "description": "Có giá trị ADC thô nhưng pct, ppm, ph đều là null. Backend trả advice: null.",
+      "expected_advice_status": "insufficient_data",
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "s-uncalib-012",
+        "recorded_at": "2026-11-04T16:00:00Z",
+        "air_temperature_c": 27.2,
+        "air_humidity_pct": 69.0,
+        "soil_temperature_c": 25.8,
+        "soil_moisture_raw": 1950,
+        "soil_moisture_pct": null,
+        "water_tds_adc_raw": 1420,
+        "water_tds_ppm": null,
+        "water_ph_adc_raw": 1910,
+        "water_ph": null,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "not_calibrated",
+          "ds18b20": "ok",
+          "tds": "not_calibrated",
+          "ph4502c": "not_calibrated"
+        }
+      },
+      "expected_advice": {
+        "version": "0.1",
+        "status": "insufficient_data",
+        "priority": 1,
+        "code": "ERR_INSUFFICIENT_DATA",
+        "message": "Cảm biến đất và nước chưa được hiệu chuẩn (not_calibrated).",
+        "suggested_action": "Thực hiện quy trình chuẩn hóa mẫu đất và dung dịch đệm cùng kỹ thuật viên trước khi áp dụng quy tắc."
+      }
+    }
+  ],
+  "time_series_24h": [
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0000",
+      "recorded_at": "2026-11-04T00:00:00Z",
+      "air_temperature_c": 20.5,
+      "air_humidity_pct": 76.0,
+      "soil_temperature_c": 21.8,
+      "soil_moisture_raw": 1993,
+      "soil_moisture_pct": 71.0,
+      "water_tds_adc_raw": 1464,
+      "water_tds_ppm": 310.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0100",
+      "recorded_at": "2026-11-04T01:00:00Z",
+      "air_temperature_c": 20.2,
+      "air_humidity_pct": 78.0,
+      "soil_temperature_c": 21.5,
+      "soil_moisture_raw": 1996,
+      "soil_moisture_pct": 70.8,
+      "water_tds_adc_raw": 1464,
+      "water_tds_ppm": 310.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0200",
+      "recorded_at": "2026-11-04T02:00:00Z",
+      "air_temperature_c": 19.8,
+      "air_humidity_pct": 79.0,
+      "soil_temperature_c": 21.2,
+      "soil_moisture_raw": 2001,
+      "soil_moisture_pct": 70.5,
+      "water_tds_adc_raw": 1472,
+      "water_tds_ppm": 312.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0300",
+      "recorded_at": "2026-11-04T03:00:00Z",
+      "air_temperature_c": 19.5,
+      "air_humidity_pct": 80.0,
+      "soil_temperature_c": 21.0,
+      "soil_moisture_raw": 2006,
+      "soil_moisture_pct": 70.2,
+      "water_tds_adc_raw": 1468,
+      "water_tds_ppm": 311.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0400",
+      "recorded_at": "2026-11-04T04:00:00Z",
+      "air_temperature_c": 19.4,
+      "air_humidity_pct": 81.0,
+      "soil_temperature_c": 20.8,
+      "soil_moisture_raw": 2010,
+      "soil_moisture_pct": 70.0,
+      "water_tds_adc_raw": 1464,
+      "water_tds_ppm": 310.0,
+      "water_ph_adc_raw": 1904,
+      "water_ph": 6.4,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0500",
+      "recorded_at": "2026-11-04T05:00:00Z",
+      "air_temperature_c": 20.0,
+      "air_humidity_pct": 79.0,
+      "soil_temperature_c": 21.0,
+      "soil_moisture_raw": 2013,
+      "soil_moisture_pct": 69.8,
+      "water_tds_adc_raw": 1464,
+      "water_tds_ppm": 310.0,
+      "water_ph_adc_raw": 1904,
+      "water_ph": 6.4,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0600",
+      "recorded_at": "2026-11-04T06:00:00Z",
+      "air_temperature_c": 21.8,
+      "air_humidity_pct": 74.0,
+      "soil_temperature_c": 21.5,
+      "soil_moisture_raw": 2018,
+      "soil_moisture_pct": 69.5,
+      "water_tds_adc_raw": 1486,
+      "water_tds_ppm": 315.0,
+      "water_ph_adc_raw": 1904,
+      "water_ph": 6.4,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0700",
+      "recorded_at": "2026-11-04T07:00:00Z",
+      "air_temperature_c": 23.5,
+      "air_humidity_pct": 69.0,
+      "soil_temperature_c": 22.5,
+      "soil_moisture_raw": 2030,
+      "soil_moisture_pct": 68.8,
+      "water_tds_adc_raw": 1499,
+      "water_tds_ppm": 318.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0800",
+      "recorded_at": "2026-11-04T08:00:00Z",
+      "air_temperature_c": 25.2,
+      "air_humidity_pct": 64.0,
+      "soil_temperature_c": 23.8,
+      "soil_moisture_raw": 2052,
+      "soil_moisture_pct": 67.5,
+      "water_tds_adc_raw": 1508,
+      "water_tds_ppm": 320.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-0900",
+      "recorded_at": "2026-11-04T09:00:00Z",
+      "air_temperature_c": 27.0,
+      "air_humidity_pct": 60.0,
+      "soil_temperature_c": 25.0,
+      "soil_moisture_raw": 2078,
+      "soil_moisture_pct": 66.0,
+      "water_tds_adc_raw": 1516,
+      "water_tds_ppm": 322.0,
+      "water_ph_adc_raw": 1882,
+      "water_ph": 6.2,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1000",
+      "recorded_at": "2026-11-04T10:00:00Z",
+      "air_temperature_c": 28.5,
+      "air_humidity_pct": 56.0,
+      "soil_temperature_c": 26.2,
+      "soil_moisture_raw": 2103,
+      "soil_moisture_pct": 64.5,
+      "water_tds_adc_raw": 1530,
+      "water_tds_ppm": 325.0,
+      "water_ph_adc_raw": 1882,
+      "water_ph": 6.2,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1100",
+      "recorded_at": "2026-11-04T11:00:00Z",
+      "air_temperature_c": 29.8,
+      "air_humidity_pct": 54.0,
+      "soil_temperature_c": 27.1,
+      "soil_moisture_raw": 2129,
+      "soil_moisture_pct": 63.0,
+      "water_tds_adc_raw": 1543,
+      "water_tds_ppm": 328.0,
+      "water_ph_adc_raw": 1882,
+      "water_ph": 6.2,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1200",
+      "recorded_at": "2026-11-04T12:00:00Z",
+      "air_temperature_c": 30.5,
+      "air_humidity_pct": 53.0,
+      "soil_temperature_c": 27.8,
+      "soil_moisture_raw": 2146,
+      "soil_moisture_pct": 62.0,
+      "water_tds_adc_raw": 1552,
+      "water_tds_ppm": 330.0,
+      "water_ph_adc_raw": 1882,
+      "water_ph": 6.2,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1300",
+      "recorded_at": "2026-11-04T13:00:00Z",
+      "air_temperature_c": 30.2,
+      "air_humidity_pct": 54.0,
+      "soil_temperature_c": 28.0,
+      "soil_moisture_raw": 1874,
+      "soil_moisture_pct": 78.0,
+      "water_tds_adc_raw": 1596,
+      "water_tds_ppm": 340.0,
+      "water_ph_adc_raw": 1904,
+      "water_ph": 6.4,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1400",
+      "recorded_at": "2026-11-04T14:00:00Z",
+      "air_temperature_c": 29.5,
+      "air_humidity_pct": 57.0,
+      "soil_temperature_c": 27.6,
+      "soil_moisture_raw": 1887,
+      "soil_moisture_pct": 77.2,
+      "water_tds_adc_raw": 1587,
+      "water_tds_ppm": 338.0,
+      "water_ph_adc_raw": 1904,
+      "water_ph": 6.4,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1500",
+      "recorded_at": "2026-11-04T15:00:00Z",
+      "air_temperature_c": 28.0,
+      "air_humidity_pct": 62.0,
+      "soil_temperature_c": 26.8,
+      "soil_moisture_raw": 1908,
+      "soil_moisture_pct": 76.0,
+      "water_tds_adc_raw": 1574,
+      "water_tds_ppm": 335.0,
+      "water_ph_adc_raw": 1904,
+      "water_ph": 6.4,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1600",
+      "recorded_at": "2026-11-04T16:00:00Z",
+      "air_temperature_c": 26.5,
+      "air_humidity_pct": 66.0,
+      "soil_temperature_c": 25.5,
+      "soil_moisture_raw": 1925,
+      "soil_moisture_pct": 75.0,
+      "water_tds_adc_raw": 1552,
+      "water_tds_ppm": 330.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1700",
+      "recorded_at": "2026-11-04T17:00:00Z",
+      "air_temperature_c": 25.0,
+      "air_humidity_pct": 70.0,
+      "soil_temperature_c": 24.5,
+      "soil_moisture_raw": 1938,
+      "soil_moisture_pct": 74.2,
+      "water_tds_adc_raw": 1530,
+      "water_tds_ppm": 325.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1800",
+      "recorded_at": "2026-11-04T18:00:00Z",
+      "air_temperature_c": 23.8,
+      "air_humidity_pct": 72.0,
+      "soil_temperature_c": 23.6,
+      "soil_moisture_raw": 1950,
+      "soil_moisture_pct": 73.5,
+      "water_tds_adc_raw": 1508,
+      "water_tds_ppm": 320.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-1900",
+      "recorded_at": "2026-11-04T19:00:00Z",
+      "air_temperature_c": 22.9,
+      "air_humidity_pct": 73.0,
+      "soil_temperature_c": 23.0,
+      "soil_moisture_raw": 1959,
+      "soil_moisture_pct": 73.0,
+      "water_tds_adc_raw": 1499,
+      "water_tds_ppm": 318.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-2000",
+      "recorded_at": "2026-11-04T20:00:00Z",
+      "air_temperature_c": 22.0,
+      "air_humidity_pct": 74.0,
+      "soil_temperature_c": 22.5,
+      "soil_moisture_raw": 1967,
+      "soil_moisture_pct": 72.5,
+      "water_tds_adc_raw": 1486,
+      "water_tds_ppm": 315.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-2100",
+      "recorded_at": "2026-11-04T21:00:00Z",
+      "air_temperature_c": 21.5,
+      "air_humidity_pct": 75.0,
+      "soil_temperature_c": 22.2,
+      "soil_moisture_raw": 1976,
+      "soil_moisture_pct": 72.0,
+      "water_tds_adc_raw": 1472,
+      "water_tds_ppm": 312.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-2200",
+      "recorded_at": "2026-11-04T22:00:00Z",
+      "air_temperature_c": 21.0,
+      "air_humidity_pct": 75.5,
+      "soil_temperature_c": 22.0,
+      "soil_moisture_raw": 1984,
+      "soil_moisture_pct": 71.5,
+      "water_tds_adc_raw": 1464,
+      "water_tds_ppm": 310.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    },
+    {
+      "schema_version": "0.1",
+      "device_id": "esp32-nursery-01",
+      "sample_id": "sample-24h-2300",
+      "recorded_at": "2026-11-04T23:00:00Z",
+      "air_temperature_c": 20.7,
+      "air_humidity_pct": 76.0,
+      "soil_temperature_c": 21.9,
+      "soil_moisture_raw": 1989,
+      "soil_moisture_pct": 71.2,
+      "water_tds_adc_raw": 1464,
+      "water_tds_ppm": 310.0,
+      "water_ph_adc_raw": 1893,
+      "water_ph": 6.3,
+      "sensor_status": {
+        "dht22": "ok",
+        "hd38": "ok",
+        "ds18b20": "ok",
+        "tds": "ok",
+        "ph4502c": "ok"
+      }
+    }
+  ]
+}
