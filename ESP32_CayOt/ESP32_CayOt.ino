@@ -80,8 +80,8 @@ constexpr float PH_VOLTAGE_FACTOR = (PH_R1_OHM + PH_R2_OHM) / PH_R2_OHM; // = 2.
 // Hai giá trị điện áp PO gốc (đơn vị V) khi nhúng điện cực vào dung dịch đệm pH 7 và pH 4.
 // Ban đầu đặt -1 để KHÔNG hiển thị giá trị pH giả.
 // Điền điện áp đo được vào đây sau khi hiệu chuẩn.
-constexpr float PH_VOLT_AT_7 = -1.0f;
-constexpr float PH_VOLT_AT_4 = -1.0f;
+constexpr float PH_VOLT_AT_7 = 2.500ff;
+constexpr float PH_VOLT_AT_4 = 2.677ff;
 
 // TDS: Hệ số kinh nghiệm; cần hiệu chuẩn bằng dung dịch TDS chuẩn.
 constexpr float TDS_CALIBRATION_FACTOR = 1.0f;
