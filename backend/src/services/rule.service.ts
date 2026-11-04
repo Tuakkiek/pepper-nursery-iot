@@ -185,3 +185,4 @@ export class RuleService {
 }
 
 export const ruleService = new RuleService();
+

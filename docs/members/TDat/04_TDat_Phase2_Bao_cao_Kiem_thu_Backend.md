@@ -70,3 +70,4 @@
 1. **API Ingest:** Hoạt động ổn định với cả dữ liệu gửi trực tiếp qua HTTP REST và dữ liệu đồng bộ tự động từ ThingSpeak Channel 3543608.
 2. **API Query:** Đáp ứng đầy đủ các kịch bản màn hình cho DKhoa (Web) và QThang (Mobile) với dữ liệu thực từ Aiven MySQL.
 3. **Quy tắc chăm sóc:** Đã tách độc lập ra file cấu hình `rules.config.json`, sẵn sàng kích hoạt ngay khi MThuy bàn giao các ngưỡng duyệt chính thức.
+
