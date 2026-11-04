@@ -39,6 +39,25 @@ function parseIntNum(val: string | null | undefined): number | null {
 export class ThingSpeakService {
   private timer: NodeJS.Timeout | null = null;
   private isSyncing = false;
+  private lastSyncAt: string | null = null;
+  private lastEntryId: number | null = null;
+  private totalSynced = 0;
+  private lastError: string | null = null;
+
+  getStatus() {
+    return {
+      enabled: config.thingspeak.enabled,
+      channelId: config.thingspeak.channelId,
+      deviceId: config.thingspeak.deviceId,
+      pollIntervalMs: config.thingspeak.pollIntervalMs,
+      isPolling: this.timer !== null,
+      isSyncing: this.isSyncing,
+      lastSyncAt: this.lastSyncAt,
+      lastEntryId: this.lastEntryId,
+      totalSynced: this.totalSynced,
+      lastError: this.lastError,
+    };
+  }
 
   mapFeedToDto(feed: ThingSpeakFeed, deviceId: string): IngestReadingDto {
     const airTemp = parseNum(feed.field1);
@@ -103,17 +122,28 @@ export class ThingSpeakService {
       const data = (await res.json()) as ThingSpeakResponse;
       const feeds = data.feeds || [];
 
+      if (data.channel && data.channel.last_entry_id !== undefined) {
+        this.lastEntryId = data.channel.last_entry_id;
+      }
+
       for (const feed of feeds) {
         const dto = this.mapFeedToDto(feed, config.thingspeak.deviceId);
         const result = await readingService.ingestReading(dto);
         if (result.status === 'created') {
           created++;
+          this.totalSynced++;
         } else if (result.status === 'duplicate') {
           duplicates++;
         }
       }
 
+      this.lastSyncAt = new Date().toISOString();
+      this.lastError = null;
+
       return { fetched: feeds.length, created, duplicates };
+    } catch (err: any) {
+      this.lastError = err.message;
+      throw err;
     } finally {
       this.isSyncing = false;
     }

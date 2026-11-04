@@ -149,8 +149,142 @@ async function runTests() {
       console.log('✓ POST invalid reading (400 Bad Request) passed');
     }
 
+    // 10. Test GET /api/v1/sync/thingspeak/status
+    {
+      const res = await request('/api/v1/sync/thingspeak/status');
+      console.assert(res.status === 200, `ThingSpeak status expected 200, got ${res.status}`);
+      console.assert(res.body.data.channelId === '3543608', 'Channel ID should be 3543608');
+      console.log('✓ GET ThingSpeak sync status passed');
+    }
+
+    // 11. Test Rule Engine Evaluation (when toggled on/off)
+    {
+      const { ruleService } = await import('../src/services/rule.service');
+      // Default: disabled -> advice null
+      const resDefault = await request('/api/v1/devices/esp32-nursery-01/readings/latest');
+      console.assert(resDefault.body.advice === null, 'advice should be null when disabled');
+
+      // Enable temporarily
+      ruleService.setEnabled(true);
+      const resEnabled = await request('/api/v1/devices/esp32-nursery-01/readings/latest');
+      console.assert(resEnabled.body.advice !== null, 'advice should not be null when enabled');
+      console.assert(typeof resEnabled.body.advice.status === 'string', 'advice should have status string');
+      console.assert(typeof resEnabled.body.advice.message === 'string', 'advice should have message string');
+
+      // Restore to disabled (conforming to G0 v0.1 draft)
+      ruleService.setEnabled(false);
+      const resRestored = await request('/api/v1/devices/esp32-nursery-01/readings/latest');
+      console.assert(resRestored.body.advice === null, 'advice should be restored to null');
+      console.log('✓ Rule Engine advice evaluation (enabled & disabled modes) passed');
+    }
+
+    // 12. Test Auth: Login as Admin
+    let adminToken = '';
+    {
+      const res = await request('/api/v1/auth/login', {
+        method: 'POST',
+        body: { username: 'admin', password: 'admin123' },
+      });
+      console.assert(res.status === 200, `Admin login expected 200, got ${res.status}`);
+      console.assert(res.body.user.role === 'admin', 'role should be admin');
+      console.assert(typeof res.body.token === 'string', 'token should be string');
+      adminToken = res.body.token;
+      console.log('✓ POST /auth/login as Admin passed');
+    }
+
+    // 13. Test Auth: Login as User
+    let userToken = '';
+    {
+      const res = await request('/api/v1/auth/login', {
+        method: 'POST',
+        body: { username: 'user', password: 'user123' },
+      });
+      console.assert(res.status === 200, `User login expected 200, got ${res.status}`);
+      console.assert(res.body.user.role === 'user', 'role should be user');
+      userToken = res.body.token;
+      console.log('✓ POST /auth/login as User passed');
+    }
+
+    // 14. Test Auth: GET /auth/me
+    {
+      const res = await request('/api/v1/auth/me', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      console.assert(res.status === 200, `Auth me expected 200, got ${res.status}`);
+      console.assert(res.body.user.username === 'admin', 'username should be admin');
+      console.log('✓ GET /auth/me passed');
+    }
+
+    // 15. Test Rules: GET /api/v1/rules
+    {
+      const res = await request('/api/v1/rules');
+      console.assert(res.status === 200, `Get rules expected 200, got ${res.status}`);
+      console.assert(res.body.total >= 10, 'Expected at least 10 seeded care rules');
+      console.log('✓ GET /rules (list care rules) passed');
+    }
+
+    // 16. Test Rules: Non-admin cannot create rule (403 Forbidden)
+    {
+      const res = await request('/api/v1/rules', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: {
+          rule_code: 'TEST_USER_RULE',
+          name: 'Test user rule',
+          parameter: 'air_temperature_c',
+          operator: '>',
+          threshold_max: 40,
+          severity: 'warning',
+          action_advice: 'Action advice test',
+        },
+      });
+      console.assert(res.status === 403, `User create rule expected 403, got ${res.status}`);
+      console.log('✓ User cannot create care rule (403 Forbidden) passed');
+    }
+
+    // 17. Test Rules: Admin can create, update, delete rule
+    let createdRuleId: number = 0;
+    {
+      // Create
+      const res = await request('/api/v1/rules', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: {
+          rule_code: 'TEST_ADMIN_RULE',
+          name: 'Quy tắc thử nghiệm của Admin',
+          parameter: 'soil_moisture_pct',
+          operator: '<',
+          threshold_min: 30,
+          severity: 'danger',
+          action_advice: 'Độ ẩm cực thấp dưới 30%, tưới khẩn cấp.',
+        },
+      });
+      console.assert(res.status === 201, `Admin create rule expected 201, got ${res.status}`);
+      createdRuleId = res.body.rule.id;
+      console.assert(createdRuleId > 0, 'createdRuleId should be valid');
+
+      // Update
+      const resUpdate = await request(`/api/v1/rules/${createdRuleId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: {
+          name: 'Quy tắc đã được Admin cập nhật',
+        },
+      });
+      console.assert(resUpdate.status === 200, `Admin update rule expected 200, got ${resUpdate.status}`);
+      console.assert(resUpdate.body.rule.name === 'Quy tắc đã được Admin cập nhật', 'Updated name should match');
+
+      // Delete
+      const resDelete = await request(`/api/v1/rules/${createdRuleId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      console.assert(resDelete.status === 200, `Admin delete rule expected 200, got ${resDelete.status}`);
+      console.log('✓ Admin CRUD care rules (Create, Update, Delete) passed');
+    }
+
     console.log('=======================================');
-    console.log(' ALL 9 INTEGRATION TESTS PASSED 100%! ');
+    console.log(' ALL 17 INTEGRATION TESTS PASSED 100%! ');
     console.log('=======================================');
   } finally {
     server.close();

@@ -26,6 +26,19 @@ Backend tính is_stale bằng thời điểm hiện tại trừ recorded_at đá
 
 Trường advice là null cho tới khi MThuy bàn giao quy tắc có nguồn và ca thử; nếu được bật, chỉ backend tính và trả cấu trúc có version, status, message. Không đặt ngưỡng riêng ở web/mobile. Các API chỉ đọc dùng cùng kiểu dữ liệu/đơn vị ở sensor-reading.md.
 
+## Xác thực và Phân quyền (Auth)
+
+Hệ thống hỗ trợ 2 vai trò: `admin` (toàn quyền) và `user` (chỉ xem).
+- `POST /api/v1/auth/login`: Nhận `{ username, password }`, trả về HTTP 200 `{ status: "ok", token: "...", user: { id, username, full_name, role } }`. Mã lỗi 401 `invalid_credentials`.
+- `GET /api/v1/auth/me`: Yêu cầu header `Authorization: Bearer <token>`, trả thông tin người dùng đang đăng nhập.
+
+## Quản lý Quy tắc Chăm sóc Cây ớt (Care Rules)
+
+- `GET /api/v1/rules`: Lấy danh sách quy tắc đang hoạt động (`is_active = true`). Web và mobile dùng để hiển thị các ngưỡng và lời khuyên chăm sóc cho người dùng.
+- `POST /api/v1/rules`: Thêm quy tắc mới (Chỉ dành cho `admin`, yêu cầu `Authorization: Bearer <admin_token>`). Trả 201 Created. Nếu `user` gọi trả 403 `forbidden`.
+- `PUT /api/v1/rules/{id}`: Cập nhật ngưỡng hoặc nội dung lời khuyên (Chỉ dành cho `admin`).
+- `DELETE /api/v1/rules/{id}`: Xóa quy tắc (Chỉ dành cho `admin`).
+
 ## Môi trường thử
 
 TDat công bố base URL trong README backend ở Phase 1; địa chỉ máy, cổng và thông tin truy cập thực tế là cấu hình môi trường, không hardcode vào hợp đồng. DKhoa/QThang dùng fixture trước khi backend chạy. Mọi thay đổi endpoint hoặc JSON sau G0 cần ví dụ trước/sau và review của các bên tiêu thụ.

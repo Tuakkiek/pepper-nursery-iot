@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { pool } from '../db/connection';
 import { runMigrations } from '../db/migrations';
 import { computePayloadHash } from '../services/reading.service';
@@ -146,6 +147,151 @@ export async function seedDatabase(): Promise<void> {
   await insertReading(sample3, new Date('2026-11-04T08:02:02Z'));
   await insertReading(sampleLive, now);
   await insertReading(sampleStale, staleTime);
+
+  // 3. Default Users (Admin & User)
+  const adminHash = bcrypt.hashSync('admin123', 10);
+  const userHash = bcrypt.hashSync('user123', 10);
+
+  await pool.query(`
+    INSERT INTO users (username, password_hash, full_name, role)
+    VALUES 
+      ('admin', ?, 'Quản trị viên Vườn ươm', 'admin'),
+      ('user', ?, 'Kỹ thuật viên Vườn ươm', 'user')
+    ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role)
+  `, [adminHash, userHash]);
+
+  // 4. Default Care Rules for Pepper Nursery (Ớt con)
+  const defaultRules = [
+    {
+      code: 'RULE_TEMP_HIGH',
+      name: 'Nhiệt độ không khí quá cao',
+      desc: 'Nhiệt độ vượt ngưỡng an toàn cho cây ớt con',
+      param: 'air_temperature_c',
+      op: '>',
+      min: null,
+      max: 35.0,
+      sev: 'danger',
+      advice: 'Nhiệt độ không khí vượt 35°C, bật lưới đen che nắng và kích hoạt phun sương làm mát.',
+    },
+    {
+      code: 'RULE_TEMP_LOW',
+      name: 'Nhiệt độ không khí thấp',
+      desc: 'Thời tiết lạnh làm chậm sinh trưởng cây con',
+      param: 'air_temperature_c',
+      op: '<',
+      min: 18.0,
+      max: null,
+      sev: 'warning',
+      advice: 'Nhiệt độ không khí dưới 18°C, hạ màng phủ kín tránh rét cho cây ớt con.',
+    },
+    {
+      code: 'RULE_HUM_HIGH',
+      name: 'Độ ẩm không khí quá cao',
+      desc: 'Nguy cơ bùng phát nấm bệnh lở cổ rễ',
+      param: 'air_humidity_pct',
+      op: '>',
+      min: null,
+      max: 85.0,
+      sev: 'warning',
+      advice: 'Độ ẩm không khí > 85%, tăng cường quạt thông gió để phòng ngừa nấm bệnh lở cổ rễ.',
+    },
+    {
+      code: 'RULE_HUM_LOW',
+      name: 'Không khí quá khô',
+      desc: 'Gây héo lá non do thoát hơi nước nhanh',
+      param: 'air_humidity_pct',
+      op: '<',
+      min: 50.0,
+      max: null,
+      sev: 'warning',
+      advice: 'Độ ẩm không khí < 50%, phun sương giữ ẩm không khí cho lá non.',
+    },
+    {
+      code: 'RULE_SOIL_DRY',
+      name: 'Giá thể khô hạn thiếu nước',
+      desc: 'Độ ẩm đất thấp, rễ non không lấy được nước',
+      param: 'soil_moisture_pct',
+      op: '<',
+      min: 45.0,
+      max: null,
+      sev: 'danger',
+      advice: 'Độ ẩm giá thể dưới 45%, kích hoạt hệ thống tưới nhỏ giọt bổ sung nước.',
+    },
+    {
+      code: 'RULE_SOIL_WET',
+      name: 'Giá thể quá ẩm thừa nước',
+      desc: 'Nguy cơ nghẹt rễ và thối rễ non',
+      param: 'soil_moisture_pct',
+      op: '>',
+      min: null,
+      max: 80.0,
+      sev: 'warning',
+      advice: 'Độ ẩm giá thể vượt 80%, tạm ngưng tưới và khơi thông thoát nước tránh thối rễ.',
+    },
+    {
+      code: 'RULE_PH_ACID',
+      name: 'Nước tưới quá chua (Axit)',
+      desc: 'pH thấp gây độc rễ và khó hấp thu lân',
+      param: 'water_ph',
+      op: '<',
+      min: 5.5,
+      max: null,
+      sev: 'danger',
+      advice: 'pH nước tưới dưới 5.5 (quá chua), cần dùng dung dịch nâng pH trước khi tưới.',
+    },
+    {
+      code: 'RULE_PH_ALKALINE',
+      name: 'Nước tưới có tính kiềm',
+      desc: 'pH cao làm kết tủa vi lượng',
+      param: 'water_ph',
+      op: '>',
+      min: null,
+      max: 7.2,
+      sev: 'warning',
+      advice: 'pH nước tưới trên 7.2 (hơi kiềm), điều chỉnh pH về dải tối ưu 6.0 - 6.8.',
+    },
+    {
+      code: 'RULE_TDS_HIGH',
+      name: 'Dinh dưỡng nước tưới quá đặc',
+      desc: 'TDS cao gây cháy rễ và xót cây con',
+      param: 'water_tds_ppm',
+      op: '>',
+      min: null,
+      max: 800.0,
+      sev: 'danger',
+      advice: 'Chỉ số TDS > 800 ppm, dinh dưỡng quá đặc có thể gây cháy rễ non, cần pha loãng thêm nước.',
+    },
+    {
+      code: 'RULE_TDS_LOW',
+      name: 'Dinh dưỡng nước tưới loãng',
+      desc: 'TDS thấp thiếu chất cho cây con',
+      param: 'water_tds_ppm',
+      op: '<',
+      min: 400.0,
+      max: null,
+      sev: 'info',
+      advice: 'Chỉ số TDS < 400 ppm, dinh dưỡng hơi loãng, xem xét bổ sung thêm dung dịch dinh dưỡng cho ớt con.',
+    },
+  ];
+
+  for (const r of defaultRules) {
+    await pool.query(`
+      INSERT INTO care_rules (
+        rule_code, name, description, parameter, operator,
+        threshold_min, threshold_max, severity, action_advice, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        description = VALUES(description),
+        parameter = VALUES(parameter),
+        operator = VALUES(operator),
+        threshold_min = VALUES(threshold_min),
+        threshold_max = VALUES(threshold_max),
+        severity = VALUES(severity),
+        action_advice = VALUES(action_advice),
+        is_active = TRUE
+    `, [r.code, r.name, r.desc, r.param, r.op, r.min, r.max, r.sev, r.advice]);
+  }
 
   console.log('Seeding finished successfully.');
 }
