@@ -179,3 +179,94 @@ Hệ thống hỗ trợ cơ chế ESP32 gửi lên ThingSpeak và Backend tự �
   * Mỗi feed được chuyển đổi thành bản ghi chuẩn của hệ thống (`sample_id: ts-entry-{id}`) và tự động lưu vào MySQL trên Aiven.
   * **Kích hoạt đồng bộ thủ công:** Gửi `POST /api/v1/sync/thingspeak` để kích hoạt đồng bộ ngay lập tức mà không cần chờ chu kỳ 20s.
 
+---
+
+### 4.4. Xác thực và Phân quyền (Authentication & Authorization)
+Hệ thống sử dụng JWT (JSON Web Token) với 2 phân quyền: `admin` và `user`.
+
+#### Tài khoản thử nghiệm mặc định (Đã nạp sẵn qua `npm run seed`):
+| Username | Password | Quyền (Role) | Chức năng cho phép |
+| :--- | :--- | :--- | :--- |
+| `admin` | `admin123` | `admin` | Đầy đủ quyền: Xem số đo, lịch sử, thêm/sửa/xóa quy tắc chăm sóc cây |
+| `user` | `user123` | `user` | Quyền xem: Xem số đo, lịch sử, xem danh sách quy tắc (không được sửa/xóa) |
+
+#### API Đăng nhập:
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+**Phản hồi thành công (HTTP 200):**
+```json
+{
+  "status": "ok",
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "full_name": "Quản trị viên Vườn ươm",
+    "role": "admin"
+  }
+}
+```
+
+#### API Kiểm tra phiên đăng nhập:
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <token>
+```
+
+---
+
+### 4.5. API Quy tắc Chăm sóc Cây ớt (Dành cho Web & Mobile)
+
+Hệ thống đã nạp sẵn 10 quy tắc sinh học chuẩn cho vườn ươm ớt con.
+
+#### 1. Lấy danh sách quy tắc đang kích hoạt (User & Admin):
+```http
+GET /api/v1/rules
+```
+Web và Mobile dùng API này để hiển thị danh sách các ngưỡng và lời khuyên chăm sóc trên giao diện.
+
+#### 2. Thêm quy tắc mới (Chỉ Admin):
+```http
+POST /api/v1/rules
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "rule_code": "RULE_CUSTOM_01",
+  "name": "Cảnh báo nhiệt độ tối ưu cây con",
+  "parameter": "air_temperature_c",
+  "operator": "between",
+  "threshold_min": 25.0,
+  "threshold_max": 30.0,
+  "severity": "info",
+  "action_advice": "Nhiệt độ phòng ươm đang trong dải vàng 25-30°C cho ớt con phát triển tốt."
+}
+```
+
+#### 3. Sửa quy tắc (Chỉ Admin):
+```http
+PUT /api/v1/rules/:id
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "threshold_max": 36.0,
+  "action_advice": "Nhiệt độ quá cao trên 36°C, bật phun sương khẩn cấp."
+}
+```
+
+#### 4. Xóa quy tắc (Chỉ Admin):
+```http
+DELETE /api/v1/rules/:id
+Authorization: Bearer <admin_token>
+```
+
+

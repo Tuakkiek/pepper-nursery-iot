@@ -40,6 +40,35 @@ export async function runMigrations(): Promise<void> {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(64) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        full_name VARCHAR(128) NOT NULL,
+        role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
+        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS care_rules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        rule_code VARCHAR(64) NOT NULL UNIQUE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        parameter VARCHAR(64) NOT NULL,
+        operator VARCHAR(10) NOT NULL,
+        threshold_min DOUBLE NULL,
+        threshold_max DOUBLE NULL,
+        severity ENUM('info', 'warning', 'danger') NOT NULL DEFAULT 'warning',
+        action_advice TEXT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
     console.log('Migrations completed successfully.');
   } finally {
     conn.release();
@@ -51,6 +80,8 @@ export async function dropTables(): Promise<void> {
   try {
     console.log('Dropping tables...');
     await conn.query('SET FOREIGN_KEY_CHECKS = 0;');
+    await conn.query('DROP TABLE IF EXISTS care_rules;');
+    await conn.query('DROP TABLE IF EXISTS users;');
     await conn.query('DROP TABLE IF EXISTS readings;');
     await conn.query('DROP TABLE IF EXISTS devices;');
     await conn.query('SET FOREIGN_KEY_CHECKS = 1;');

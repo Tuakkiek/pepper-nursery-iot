@@ -1,16 +1,28 @@
 import { Router } from 'express';
 import { readingRouter } from './reading.routes';
 import { deviceRouter } from './device.routes';
+import { authRouter } from './auth.routes';
+import { ruleRouter } from './rule.routes';
 import { thingSpeakService } from '../services/thingspeak.service';
 
 export const apiRouter = Router();
 
+apiRouter.use('/auth', authRouter);
+apiRouter.use('/rules', ruleRouter);
 apiRouter.use('/readings', readingRouter);
 apiRouter.use('/devices', deviceRouter);
 
 // Health check endpoint
 apiRouter.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ThingSpeak status endpoint
+apiRouter.get('/sync/thingspeak/status', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    data: thingSpeakService.getStatus(),
+  });
 });
 
 // Manual trigger for ThingSpeak sync

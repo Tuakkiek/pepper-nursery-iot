@@ -31,3 +31,28 @@ CREATE TABLE IF NOT EXISTS readings (
   INDEX idx_device_received (device_id, received_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(64) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(128) NOT NULL,
+  role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS care_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rule_code VARCHAR(64) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  parameter VARCHAR(64) NOT NULL,
+  operator VARCHAR(10) NOT NULL,
+  threshold_min DOUBLE NULL,
+  threshold_max DOUBLE NULL,
+  severity ENUM('info', 'warning', 'danger') NOT NULL DEFAULT 'warning',
+  action_advice TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
