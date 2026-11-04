@@ -4,6 +4,7 @@ import { pool } from '../db/connection';
 import { config } from '../config';
 import { IngestReadingDto } from '../schemas/reading.schema';
 import { ruleService, AdviceResult } from './rule.service';
+import { careRuleService } from './care-rule.service';
 
 export interface LatestResponse {
   device_id: string;
@@ -177,7 +178,13 @@ export class ReadingService {
       isStale = diffMinutes > config.staleThresholdMinutes;
     }
 
-    const advice = ruleService.evaluate(reading, isStale);
+    let advice: AdviceResult | null = null;
+    if (ruleService.isEnabled()) {
+      advice = await careRuleService.evaluateActiveRules(reading, isStale);
+      if (!advice) {
+        advice = ruleService.evaluate(reading, isStale);
+      }
+    }
 
     return {
       device_id: deviceId,

@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import { readingRouter } from './reading.routes';
 import { deviceRouter } from './device.routes';
+import { authRouter } from './auth.routes';
+import { ruleRouter } from './rule.routes';
 import { thingSpeakService } from '../services/thingspeak.service';
 
 export const apiRouter = Router();
 
+apiRouter.use('/auth', authRouter);
+apiRouter.use('/rules', ruleRouter);
 apiRouter.use('/readings', readingRouter);
 apiRouter.use('/devices', deviceRouter);
 
