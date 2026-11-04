@@ -20,5 +20,9 @@ export const config = {
     deviceId: process.env.THINGSPEAK_DEVICE_ID || 'esp32-nursery-01',
     pollIntervalMs: parseInt(process.env.THINGSPEAK_POLL_INTERVAL_MS || '20000', 10),
   },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'pepper_nursery_secret_key_2026',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
 };
 
