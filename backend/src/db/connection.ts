@@ -8,6 +8,7 @@ export const pool = mysql.createPool({
   password: config.db.password,
   database: config.db.database,
   ssl: config.db.ssl,
+  timezone: 'Z', // Enforce UTC timestamps across all MySQL date/time operations
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
