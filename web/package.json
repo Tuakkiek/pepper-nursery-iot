@@ -1,0 +1,20 @@
+{
+  "name": "pepper-nursery-web",
+  "version": "0.1.0",
+  "description": "Web Dashboard for Pepper Nursery IoT MVP (G0 v0.1 - DKhoa)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/fixture-test.js",
+    "test:integration": "node test/integration-test.js"
+  },
+  "keywords": [
+    "iot",
+    "dashboard",
+    "pepper-nursery",
+    "esp32",
+    "sensors"
+  ],
+  "author": "DKhoa",
+  "license": "ISC"
+}

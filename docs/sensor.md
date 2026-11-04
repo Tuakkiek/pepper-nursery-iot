@@ -1,0 +1,8 @@
+- Cảm biến nhiệt độ và độ ẩm không khí DHT22 (AM2302)
+- Mạch mở rộng chân cho vi điều khiển ESP32 (ESP32 30P Expansion Board)
+- Cảm biến độ ẩm đất HD-38
+- Mạch chuyển đổi và đo độ pH nước (pH Sensor Module)
+- Mạch vi điều khiển trung tâm ESP32 (ESP32 DevKitC / ESP-32D)
+- Mạch cảm biến đo tổng chất rắn hòa tan trong nước (TDS Meter V1.0)
+- Cảm biến nhiệt độ chống nước DS18B20
+- Điện cực đo pH dạng composite (pH Composite Electrode)
