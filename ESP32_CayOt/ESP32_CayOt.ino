@@ -37,7 +37,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <math.h>
-
+#include <WiFi.h>
+#include <ThingSpeak.h>
 // =============== 1. KHAI BÁO GPIO ===============
 constexpr uint8_t PIN_DHT22   = 27;
 constexpr uint8_t PIN_DS18B20 = 26;
@@ -48,6 +49,22 @@ constexpr uint8_t PIN_TDS     = 32;
 constexpr unsigned long BAUD_RATE = 115200;
 constexpr unsigned long READ_INTERVAL_MS = 2500; // DHT22 đọc cách nhau >= 2 giây
 
+// =============== WIFI CONFIGURATION ===============
+
+const char* WIFI_SSID = "Redme Note 11";
+const char* WIFI_PASSWORD = "Ngoc0706@";
+
+// =============== THINGSPEAK CONFIGURATION ===============
+
+unsigned long CHANNEL_ID = 3543608;
+const char* WRITE_API_KEY = "QRABGSQJ1Z8A67RD";
+
+WiFiClient client;
+
+// Gửi dữ liệu mỗi 20 giây
+constexpr unsigned long THINGSPEAK_INTERVAL_MS = 20000;
+
+unsigned long lastThingSpeakUpload = 0;
 // =============== 2. THÔNG SỐ HIỆU CHUẨN ===============
 // HD-38: Đây là giá trị ADC VÍ DỤ; thay bằng giá trị ADC đo được của bạn.
 constexpr int SOIL_ADC_DRY = 3400;  // Giá trị ADC khi đất khô
@@ -125,7 +142,101 @@ float calculateTDS(float voltage, float temperatureC) {
                      857.39f * v) * 0.5f * TDS_CALIBRATION_FACTOR;
   return (ppm > 0.0f) ? ppm : 0.0f;
 }
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
 
+  Serial.println();
+  Serial.println("Dang ket noi Wi-Fi...");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  unsigned long startAttempt = millis();
+
+  while (WiFi.status() != WL_CONNECTED &&
+         millis() - startAttempt < 20000) {
+    Serial.print(".");
+    delay(500);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println();
+    Serial.println("Wi-Fi ket noi thanh cong!");
+    Serial.print("IP ESP32: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("RSSI: ");
+    Serial.println(WiFi.RSSI());
+  } else {
+    Serial.println();
+    Serial.println("Khong the ket noi Wi-Fi!");
+  }
+}
+void uploadToThingSpeak(
+  TempAndHumidity air,
+  bool airOK,
+  float probeC,
+  bool probeOK,
+  float soilPercent,
+  uint16_t soilADC,
+  float phValue,
+  uint16_t phADC,
+  float tdsPpm
+) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Wi-Fi mat ket noi, dang thu ket noi lai...");
+    connectWiFi();
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Khong gui duoc du lieu!");
+    return;
+  }
+
+  // Field 1: Nhiet do khong khi
+  ThingSpeak.setField(1,
+    airOK ? String(air.temperature, 1) : String(""));
+
+  // Field 2: Do am khong khi
+  ThingSpeak.setField(2,
+    airOK ? String(air.humidity, 1) : String(""));
+
+  // Field 3: Nhiet do dau do
+  ThingSpeak.setField(3,
+    probeOK ? String(probeC, 2) : String(""));
+
+  // Field 4: Do am dat
+  ThingSpeak.setField(4,
+    isnan(soilPercent) ? String("") : String(soilPercent, 1));
+
+  // Field 5: pH
+  ThingSpeak.setField(5,
+    isnan(phValue) ? String("") : String(phValue, 2));
+
+  // Field 6: TDS
+  ThingSpeak.setField(6, String(tdsPpm, 1));
+
+  // Field 7: ADC dat
+  ThingSpeak.setField(7, String(soilADC));
+
+  // Field 8: ADC pH
+  ThingSpeak.setField(8, String(phADC));
+
+  // Gui tat ca cac Field
+  int response = ThingSpeak.writeFields(
+    CHANNEL_ID,
+    WRITE_API_KEY
+  );
+
+  if (response == 200) {
+    Serial.println();
+    Serial.println("THINGSPEAK: GUI DU LIEU THANH CONG!");
+  } else {
+    Serial.print("THINGSPEAK: LOI GUI DU LIEU. HTTP CODE = ");
+    Serial.println(response);
+  }
+}
 void setup() {
   Serial.begin(BAUD_RATE);
   delay(1200);
@@ -154,13 +265,21 @@ void setup() {
   Serial.println("Đã xác nhận: DHT22 và DS18B20 có điện trở kéo lên trên module.");
   Serial.println("Jumper: V-3.3V; pH: nguồn 5V riêng + chia áp 10k/10k.");
   Serial.println("Cần hiệu chuẩn HD-38, pH và TDS trước khi sử dụng định lượng.");
+
+  // Ket noi Wi-Fi
+connectWiFi();
+
+// Khoi tao ThingSpeak
+ThingSpeak.begin(client);
+
+Serial.println("ThingSpeak da khoi tao!");
+Serial.printf("Channel ID: %lu\n", CHANNEL_ID);
 }
 
 void loop() {
   // (1) DHT22: Nhiệt độ và độ ẩm không khí
   TempAndHumidity air = dht.getTempAndHumidity();
-  const bool airOK = !isnan(air.temperature) && !isnan(air.humidity) &&
-                     (dht.getStatus() == DHTesp::ERROR_NONE);
+  const bool airOK = !isnan(air.temperature) && !isnan(air.humidity) && (dht.getStatus() == DHTesp::ERROR_NONE);
 
   // (2) DS18B20: Nhiệt độ đầu dò (đất hoặc nước)
   ds18b20.requestTemperatures();
@@ -232,4 +351,23 @@ void loop() {
   Serial.println("----------------------------------------------------");
 
   delay(READ_INTERVAL_MS);
+  // =============== GUI DU LIEU THINGSPEAK ===============
+
+if (lastThingSpeakUpload == 0 ||
+    millis() - lastThingSpeakUpload >= THINGSPEAK_INTERVAL_MS) {
+
+  lastThingSpeakUpload = millis();
+
+  uploadToThingSpeak(
+    air,
+    airOK,
+    probeC,
+    probeOK,
+    soilPercent,
+    soil.raw,
+    phValue,
+    ph.raw,
+    tdsPpm
+  );
+}
 }
