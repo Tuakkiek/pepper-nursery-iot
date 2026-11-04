@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1",
+  "device_id": "esp32-nursery-01",
+  "sample_id": "sample-0002",
+  "recorded_at": null,
+  "air_temperature_c": 28.2,
+  "air_humidity_pct": 72.0,
+  "soil_temperature_c": 27.1,
+  "soil_moisture_raw": 1800,
+  "soil_moisture_pct": null,
+  "water_tds_adc_raw": 1560,
+  "water_tds_ppm": null,
+  "water_ph_adc_raw": 1930,
+  "water_ph": null,
+  "sensor_status": {
+    "dht22": "ok",
+    "hd38": "not_calibrated",
+    "ds18b20": "ok",
+    "tds": "not_calibrated",
+    "ph4502c": "not_calibrated"
+  }
+}
