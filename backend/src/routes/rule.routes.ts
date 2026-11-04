@@ -18,3 +18,4 @@ ruleRouter.get('/:id', getRuleByIdHandler);
 ruleRouter.post('/', authenticate, requireAdmin, createRuleHandler);
 ruleRouter.put('/:id', authenticate, requireAdmin, updateRuleHandler);
 ruleRouter.delete('/:id', authenticate, requireAdmin, deleteRuleHandler);
+

@@ -29,3 +29,4 @@ export const UpdateCareRuleSchema = CreateCareRuleSchema.partial();
 
 export type CreateCareRuleDto = z.infer<typeof CreateCareRuleSchema>;
 export type UpdateCareRuleDto = z.infer<typeof UpdateCareRuleSchema>;
+

@@ -105,3 +105,4 @@ export async function meHandler(req: Request, res: Response): Promise<void> {
     user: req.user,
   });
 }
+
