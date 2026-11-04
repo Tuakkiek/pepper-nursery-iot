@@ -3,17 +3,15 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { pool } from '../db/connection';
 import { config } from '../config';
 import { IngestReadingDto } from '../schemas/reading.schema';
+import { ruleService, AdviceResult } from './rule.service';
+import { careRuleService } from './care-rule.service';
 
 export interface LatestResponse {
   device_id: string;
   reading: IngestReadingDto | null;
   received_at: string | null;
   is_stale: boolean | null;
-  advice: null | {
-    version: string;
-    status: string;
-    message: string;
-  };
+  advice: AdviceResult | null;
 }
 
 export interface HistoryItem {
@@ -180,12 +178,20 @@ export class ReadingService {
       isStale = diffMinutes > config.staleThresholdMinutes;
     }
 
+    let advice: AdviceResult | null = null;
+    if (ruleService.isEnabled()) {
+      advice = await careRuleService.evaluateActiveRules(reading, isStale);
+      if (!advice) {
+        advice = ruleService.evaluate(reading, isStale);
+      }
+    }
+
     return {
       device_id: deviceId,
       reading,
       received_at: formatUtcIso(row.received_at),
       is_stale: isStale,
-      advice: null, // G0 contract: advice is null until MThuy's rules are approved
+      advice,
     };
   }
 
