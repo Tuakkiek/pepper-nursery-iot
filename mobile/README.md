@@ -8,92 +8,71 @@
 
 - **Flutter SDK**: `>= 3.13.0` (đã kiểm tra tương thích với Flutter `3.47.9` / Dart `3.13.7`).
 - **Nền tảng hỗ trợ**:
-  - **Chrome (Web)**: Chạy thử nhanh không cần máy ảo (`flutter run -d chrome`).
-  - **Android**: Thiết bị thật hoặc emulator qua ADB.
+  - **Chrome (Web)**: Chạy thử nhanh (`flutter run -d chrome`).
+  - **Android**: Thiết bị thật hoặc máy ảo qua ADB (`flutter run -d android`).
   - **Windows Desktop**: (`flutter run -d windows`).
 
 ---
 
-## 2. Cài đặt và khởi chạy
+## 2. Kết nối Backend (Phase 2 & Phase 3)
+
+Backend của dự án (do TDat phụ trách) chạy trên cổng **`8000`** (`http://localhost:8000/api/v1`).
+
+### Cấu hình địa chỉ gọi API theo môi trường:
+* **Trình giả lập Android Emulator**: `http://10.0.2.2:8000` (đã cấu hình tự động nhận diện).
+* **Trình duyệt Chrome (Web) & Windows Desktop**: `http://localhost:8000`.
+* **Điện thoại thật kết nối Wi-Fi LAN**: `http://<IP_LAN_MAY_BACKEND>:8000` (ví dụ `http://192.168.1.15:8000`).
+
+### Các Endpoint Backend đã tích hợp:
+1. **Kiểm tra trạng thái máy chủ (Health Check)**:
+   * `GET /api/v1/health`
+2. **Số đo mới nhất**:
+   * `GET /api/v1/devices/{device_id}/readings/latest`
+   * Hỗ trợ 3 thiết bị mẫu từ Backend:
+     - `esp32-nursery-01`: Trạm hoạt động bình thường, đồng bộ số đo thật.
+     - `esp32-stale-01`: Trạm mất tín hiệu > 5 phút (`is_stale: true`).
+     - `esp32-empty-01`: Trạm mới chưa có dữ liệu (`reading: null`).
+3. **Lịch sử số đo**:
+   * `GET /api/v1/devices/{device_id}/readings?limit=20`
+4. **Quy tắc chăm sóc hệ thống**:
+   * `GET /api/v1/rules`: Tải danh sách quy tắc chăm sóc động từ CSDL MySQL trên Aiven.
+5. **Đồng bộ ThingSpeak tức thì**:
+   * `POST /api/v1/sync/thingspeak`: Gọi API đồng bộ các feed mới nhất từ ThingSpeak Channel `3543608`.
+6. **Xác thực & Phân quyền (JWT)**:
+   * `POST /api/v1/auth/login`: Hỗ trợ tài khoản `admin` / `admin123` hoặc `user` / `user123`.
+
+---
+
+## 3. Chuyển đổi giữa Backend Live và Dữ liệu mẫu (Fixture G0)
+
+Nhấn vào biểu tượng **Cài đặt (biểu tượng thanh gạt `Tune` trên góc AppBar)** để:
+- Chuyển đổi giữa chế độ **Backend thật (API Live)** và **Dữ liệu mẫu (Fixture G0)**.
+- Đổi địa chỉ Base URL hoặc chọn nhanh (Localhost / Android Emulator).
+- Nút **Kiểm tra kết nối (Ping Health)** kiểm tra trực tiếp máy chủ có phản hồi hay không.
+- Bấm **Đồng bộ ngay** để ép đồng bộ ThingSpeak.
+- Đăng nhập / Đăng xuất tài khoản quản trị viên.
+
+---
+
+## 4. Chạy và Kiểm thử
 
 Di chuyển vào thư mục `mobile`:
-
 ```bash
 cd mobile
-```
-
-### Cài đặt dependencies:
-```bash
 flutter pub get
 ```
 
-### Chạy ứng dụng trên Chrome (khuyến nghị để test giao diện nhanh):
+### Chạy ứng dụng:
 ```bash
+# Trên Chrome
 flutter run -d chrome
-```
 
-### Chạy ứng dụng trên thiết bị Android / Giả lập:
-```bash
+# Trên Android
 flutter run -d android
 ```
 
-### Kiểm tra cú pháp và chạy test:
+### Chạy toàn bộ bộ kiểm thử tự động (12 ca kiểm thử):
 ```bash
 flutter analyze
 flutter test
 ```
-
----
-
-## 3. Các kịch bản dữ liệu mẫu (Phase 1 — Fixtures)
-
-Ứng dụng tích hợp sẵn dropdown **Kịch bản thử nghiệm** ngay trên màn hình để kiểm thử các trạng thái theo tài liệu G0 mà không phụ thuộc vào backend hoặc ESP32:
-
-1. **Bình thường (`latest-normal.json`)**: Hiển thị đầy đủ 5 cảm biến, trạng thái xanh ngọc ("Bình thường"), thời gian đo và nhận rõ ràng.
-2. **Lỗi một phần cảm biến (`latest-partial-error.json`)**: Cảm biến DHT22 và TDS báo lỗi ("Lỗi cảm biến" nền hồng đỏ, chữ đỏ san hô), các cảm biến còn lại vẫn hiển thị số đo hợp lệ.
-3. **Chưa hiệu chuẩn (`latest-uncalibrated.json`)**: HD-38, TDS và pH hiển thị số thô ADC kèm nhãn "Chưa hiệu chuẩn", **tuyệt đối không gắn nhãn %, ppm hay pH**.
-4. **Dữ liệu cũ (`latest-stale.json`)**: Banner cảnh báo màu đỏ san hô "Dữ liệu cũ", thông báo lần cập nhật cuối và nguy cơ thiết bị mất liên lạc.
-5. **Chưa có dữ liệu (`latest-empty.json`)**: Hiển thị thông báo "Chưa có dữ liệu số đo cho thiết bị này", không tự ý sinh số `0` giả.
-6. **Lỗi máy chủ (`server-error.json`)**: Hiển thị thông báo lỗi và nút **Thử lại**.
-
----
-
-## 4. Cấu trúc thư mục mã nguồn
-
-```text
-mobile/
-├── assets/
-│   └── fixtures/           # Bộ fixture JSON đồng bộ từ docs/contracts/fixtures/
-├── lib/
-│   ├── core/
-│   │   └── constants/
-│   │       ├── app_colors.dart   # Design tokens chuẩn theo Design_System_Web_Mobile.md
-│   │       └── app_theme.dart    # Cấu hình theme sáng (Cream background, Navy text)
-│   ├── models/
-│   │   └── sensor_reading.dart   # Schema dữ liệu khớp với api.md và sensor-reading.md
-│   ├── services/
-│   │   └── api_service.dart      # Lớp adapter lấy dữ liệu (hỗ trợ cả Fixture và REST API)
-│   ├── views/
-│   │   ├── screens/
-│   │   │   ├── dashboard_screen.dart # Màn hình tổng quan số đo mới nhất
-│   │   │   └── history_screen.dart   # Màn hình lịch sử số đo
-│   │   └── widgets/
-│   │       └── metric_card.dart      # Thẻ MetricCard theo đúng Design System
-│   └── main.dart                     # Điều hướng và khởi động ứng dụng
-├── test/
-│   └── widget_test.dart
-├── pubspec.yaml
-└── README.md
-```
-
----
-
-## 5. Kết nối Backend thật (Phase 2 & Phase 3)
-
-Khi backend do TDat triển khai sẵn sàng:
-1. Mở `lib/services/api_service.dart`.
-2. Chuyển `mode = DataSourceMode.live`.
-3. Đặt `baseUrl` tương ứng:
-   - Trên trình giả lập Android Emulator: `http://10.0.2.2:3000`
-   - Trên điện thoại thật qua mạng Wi-Fi: `http://<IP_MAY_TINH>:3000` (ví dụ: `http://192.168.1.15:3000`)
-   - Trên Chrome Web: `http://localhost:3000`

@@ -6,12 +6,14 @@ import '../../models/sensor_reading.dart';
 class DeviceStatusCard extends StatelessWidget {
   final LatestReadingResponse? latestData;
   final bool isFixtureMode;
+  final bool isBackendOnline;
   final VoidCallback? onConfigure;
 
   const DeviceStatusCard({
     super.key,
     required this.latestData,
     required this.isFixtureMode,
+    this.isBackendOnline = false,
     this.onConfigure,
   });
 
@@ -101,25 +103,27 @@ class DeviceStatusCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (isFixtureMode) ...[
-                          const SizedBox(width: AppSpacing.space2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Text(
-                              'Dữ liệu mẫu',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
+                        const SizedBox(width: AppSpacing.space2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            isFixtureMode
+                                ? 'Dữ liệu mẫu'
+                                : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isFixtureMode
+                                  ? AppColors.textSecondary
+                                  : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong),
                             ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),

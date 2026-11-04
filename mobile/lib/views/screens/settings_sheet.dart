@@ -17,6 +17,20 @@ class _SettingsSheetState extends State<SettingsSheet> {
   late TextEditingController _urlController;
   late TextEditingController _deviceController;
 
+  // Health ping state
+  bool _isCheckingHealth = false;
+  bool? _healthStatus;
+  String? _healthMessage;
+
+  // ThingSpeak sync state
+  bool _isSyncingThingSpeak = false;
+
+  // Auth form state
+  final TextEditingController _usernameController = TextEditingController(text: 'admin');
+  final TextEditingController _passwordController = TextEditingController(text: 'admin123');
+  bool _isLoggingIn = false;
+  String? _authError;
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +44,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
   void dispose() {
     _urlController.dispose();
     _deviceController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -39,6 +55,85 @@ class _SettingsSheetState extends State<SettingsSheet> {
     widget.apiService.baseUrl = _urlController.text.trim();
     widget.apiService.deviceId = _deviceController.text.trim();
     Navigator.of(context).pop(true);
+  }
+
+  Future<void> _checkHealth() async {
+    setState(() {
+      _isCheckingHealth = true;
+      _healthStatus = null;
+      _healthMessage = null;
+    });
+
+    widget.apiService.baseUrl = _urlController.text.trim();
+    final ok = await widget.apiService.checkHealth();
+
+    setState(() {
+      _isCheckingHealth = false;
+      _healthStatus = ok;
+      _healthMessage = ok
+          ? 'Máy chủ Backend đang hoạt động bình thường'
+          : 'Không thể kết nối tới ${_urlController.text.trim()}';
+    });
+  }
+
+  Future<void> _syncThingSpeak() async {
+    setState(() {
+      _isSyncingThingSpeak = true;
+    });
+
+    try {
+      final res = await widget.apiService.triggerThingSpeakSync();
+      final added = res['added'] ?? 0;
+      final total = res['total_feeds'] ?? 0;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.navy,
+            content: Text('Đồng bộ ThingSpeak thành công! ($added bản ghi mới / $total feeds)'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.coralStrong,
+            content: Text('Lỗi đồng bộ: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncingThingSpeak = false);
+    }
+  }
+
+  Future<void> _login() async {
+    setState(() {
+      _isLoggingIn = true;
+      _authError = null;
+    });
+
+    try {
+      widget.apiService.baseUrl = _urlController.text.trim();
+      final user = await widget.apiService.login(
+        _usernameController.text.trim(),
+        _passwordController.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.navy,
+            content: Text('Đăng nhập thành công: ${user.fullName} (${user.role})'),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _authError = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _isLoggingIn = false);
+    }
   }
 
   @override
@@ -71,56 +166,163 @@ class _SettingsSheetState extends State<SettingsSheet> {
             ),
             const SizedBox(height: AppSpacing.space3),
             const Text(
-              'Cấu hình kết nối & Dữ liệu',
+              'Cấu hình Kết Nối Backend & Dữ Liệu',
               style: AppTypography.sectionTitle,
             ),
-            const SizedBox(height: AppSpacing.space3),
+            const SizedBox(height: AppSpacing.space4),
 
-            // Chế độ nguồn dữ liệu
+            // 1. Chế độ nguồn dữ liệu
             const Text(
               'Nguồn dữ liệu:',
-              style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.navy),
+              style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
             ),
             const SizedBox(height: AppSpacing.space1),
             Row(
               children: [
                 Expanded(
                   child: ChoiceChip(
-                    label: const Center(child: Text('Dữ liệu mẫu (Fixture)')),
-                    selected: _mode == DataSourceMode.fixture,
-                    selectedColor: AppColors.tealSoft,
-                    labelStyle: TextStyle(
-                      color: _mode == DataSourceMode.fixture ? AppColors.navy : AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _mode = DataSourceMode.fixture);
-                    },
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.space2),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Center(child: Text('Backend thật (API)')),
+                    label: const Center(child: Text('Backend thật (API Live)')),
                     selected: _mode == DataSourceMode.live,
                     selectedColor: AppColors.tealSoft,
                     labelStyle: TextStyle(
                       color: _mode == DataSourceMode.live ? AppColors.navy : AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                     onSelected: (selected) {
                       if (selected) setState(() => _mode = DataSourceMode.live);
                     },
                   ),
                 ),
+                const SizedBox(width: AppSpacing.space2),
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Center(child: Text('Dữ liệu mẫu (Fixture G0)')),
+                    selected: _mode == DataSourceMode.fixture,
+                    selectedColor: AppColors.tealSoft,
+                    labelStyle: TextStyle(
+                      color: _mode == DataSourceMode.fixture ? AppColors.navy : AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) setState(() => _mode = DataSourceMode.fixture);
+                    },
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: AppSpacing.space3),
+            const SizedBox(height: AppSpacing.space4),
 
-            if (_mode == DataSourceMode.fixture) ...[
+            // 2. Cấu hình Backend URL khi ở chế độ Live
+            if (_mode == DataSourceMode.live) ...[
               const Text(
-                'Kịch bản thử nghiệm (Phase 1):',
-                style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.navy),
+                'Địa chỉ Backend URL (TDat - Port 8000):',
+                style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
+              ),
+              const SizedBox(height: AppSpacing.space1),
+              TextField(
+                controller: _urlController,
+                decoration: const InputDecoration(
+                  hintText: 'http://localhost:8000 hoặc http://10.0.2.2:8000',
+                  prefixIcon: Icon(Icons.link, size: 20, color: AppColors.navy),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.space1),
+
+              // Nút chọn nhanh cấu hình mẫu URL
+              Wrap(
+                spacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('Localhost (8000)'),
+                    onPressed: () => setState(() => _urlController.text = 'http://localhost:8000'),
+                  ),
+                  ActionChip(
+                    label: const Text('Android Emulator (10.0.2.2:8000)'),
+                    onPressed: () => setState(() => _urlController.text = 'http://10.0.2.2:8000'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.space2),
+
+              // Nút kiểm tra kết nối (Ping Health)
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    icon: _isCheckingHealth
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.navy),
+                          )
+                        : const Icon(Icons.network_check, size: 18),
+                    label: const Text('Kiểm tra kết nối (Ping)'),
+                    onPressed: _isCheckingHealth ? null : _checkHealth,
+                  ),
+                  const SizedBox(width: AppSpacing.space2),
+                  if (_healthStatus != null)
+                    Expanded(
+                      child: Text(
+                        _healthMessage ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _healthStatus! ? const Color(0xFF155724) : AppColors.coralStrong,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.space4),
+
+              // Nút kích hoạt đồng bộ ThingSpeak
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.space3),
+                decoration: BoxDecoration(
+                  color: AppColors.cream,
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_sync, color: AppColors.navy),
+                    const SizedBox(width: AppSpacing.space2),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kênh ThingSpeak (Channel 3543608)',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.navy),
+                          ),
+                          Text(
+                            'ESP32 gửi lên ThingSpeak, Backend tự động đồng bộ.',
+                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        foregroundColor: AppColors.navy,
+                        minimumSize: const Size(90, 36),
+                      ),
+                      onPressed: _isSyncingThingSpeak ? null : _syncThingSpeak,
+                      child: _isSyncingThingSpeak
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.navy),
+                            )
+                          : const Text('Đồng bộ ngay', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              const Text(
+                'Kịch bản kiểm thử G0 (Phase 1):',
+                style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
               ),
               const SizedBox(height: AppSpacing.space1),
               Container(
@@ -137,10 +339,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                     items: FixtureScenario.values.map((s) {
                       return DropdownMenuItem(
                         value: s,
-                        child: Text(
-                          s.label,
-                          style: const TextStyle(fontSize: 13, color: AppColors.navy),
-                        ),
+                        child: Text(s.label, style: const TextStyle(fontSize: 13, color: AppColors.navy)),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -149,42 +348,165 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   ),
                 ),
               ),
-            ] else ...[
-              const Text(
-                'Base URL API Backend:',
-                style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.navy),
-              ),
-              const SizedBox(height: AppSpacing.space1),
-              TextField(
-                controller: _urlController,
-                decoration: const InputDecoration(
-                  hintText: 'http://10.0.2.2:3000 hoặc http://192.168.1.x:3000',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.space1),
-              const Text(
-                'Lưu ý: Android Emulator dùng 10.0.2.2; Điện thoại thật dùng IP LAN máy tính.',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
             ],
 
-            const SizedBox(height: AppSpacing.space3),
+            const SizedBox(height: AppSpacing.space4),
+
+            // 3. Chọn thiết bị (Device ID)
             const Text(
-              'Mã thiết bị (Device ID):',
-              style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.navy),
+              'Thiết bị theo dõi (Device ID):',
+              style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
             ),
             const SizedBox(height: AppSpacing.space1),
             TextField(
               controller: _deviceController,
               decoration: const InputDecoration(
                 hintText: 'esp32-nursery-01',
+                prefixIcon: Icon(Icons.developer_board, size: 20, color: AppColors.navy),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.space1),
+            Wrap(
+              spacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('esp32-nursery-01 (Bình thường)'),
+                  onPressed: () => setState(() => _deviceController.text = 'esp32-nursery-01'),
+                ),
+                ActionChip(
+                  label: const Text('esp32-stale-01 (Dữ liệu cũ)'),
+                  onPressed: () => setState(() => _deviceController.text = 'esp32-stale-01'),
+                ),
+                ActionChip(
+                  label: const Text('esp32-empty-01 (Chưa có số đo)'),
+                  onPressed: () => setState(() => _deviceController.text = 'esp32-empty-01'),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: AppSpacing.space6),
+
+            // 4. Tài khoản & Phân quyền (Authentication)
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.space4),
+              decoration: BoxDecoration(
+                color: AppColors.cream,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Xác thực người dùng (JWT)',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.navy),
+                      ),
+                      if (widget.apiService.isAuthenticated)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.tealSoft,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            widget.apiService.currentUser!.role.toUpperCase(),
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.navy),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.space2),
+
+                  if (widget.apiService.isAuthenticated) ...[
+                    Text(
+                      'Đã đăng nhập: ${widget.apiService.currentUser!.fullName} (@${widget.apiService.currentUser!.username})',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.navy),
+                    ),
+                    const SizedBox(height: AppSpacing.space2),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 40)),
+                      onPressed: () {
+                        setState(() {
+                          widget.apiService.logout();
+                        });
+                      },
+                      child: const Text('Đăng xuất'),
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _usernameController,
+                            decoration: const InputDecoration(
+                              hintText: 'Tên đăng nhập',
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _passwordController,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              hintText: 'Mật khẩu',
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_authError != null) ...[
+                      const SizedBox(height: 6),
+                      Text(_authError!, style: const TextStyle(fontSize: 12, color: AppColors.coralStrong)),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(minimumSize: const Size(0, 40)),
+                            onPressed: _isLoggingIn ? null : _login,
+                            child: _isLoggingIn
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Đăng nhập'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          label: const Text('admin'),
+                          onPressed: () {
+                            _usernameController.text = 'admin';
+                            _passwordController.text = 'admin123';
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        ActionChip(
+                          label: const Text('user'),
+                          onPressed: () {
+                            _usernameController.text = 'user';
+                            _passwordController.text = 'user123';
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
 
             const SizedBox(height: AppSpacing.space6),
             ElevatedButton(
               onPressed: _save,
-              child: const Text('Lưu và áp dụng'),
+              child: const Text('Lưu và Áp dụng'),
             ),
           ],
         ),
@@ -192,4 +514,3 @@ class _SettingsSheetState extends State<SettingsSheet> {
     );
   }
 }
-

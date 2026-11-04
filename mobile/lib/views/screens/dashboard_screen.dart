@@ -86,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),
-            tooltip: 'Cài đặt nguồn dữ liệu',
+            tooltip: 'Cài đặt kết nối backend',
             onPressed: _openSettings,
           ),
           IconButton(
@@ -114,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             DeviceStatusCard(
               latestData: _latestData,
               isFixtureMode: isFixture,
+              isBackendOnline: widget.apiService.isBackendOnline,
               onConfigure: _openSettings,
             ),
             const SizedBox(height: AppSpacing.space3),
@@ -212,6 +213,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildErrorBanner(String message) {
+    final isLive = widget.apiService.mode == DataSourceMode.live;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.space6),
       decoration: BoxDecoration(
@@ -233,18 +236,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: AppSpacing.space1),
           Text(
-            message,
+            isLive
+                ? 'Không thể kết nối đến Backend tại ${widget.apiService.baseUrl}\n($message)'
+                : message,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, color: AppColors.navy),
           ),
           const SizedBox(height: AppSpacing.space4),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.navy,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: _loadData,
-            child: const Text('Thử lại'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.navy,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(110, 42),
+                ),
+                onPressed: _loadData,
+                child: const Text('Thử lại'),
+              ),
+              if (isLive) ...[
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size(110, 42)),
+                  onPressed: () {
+                    widget.apiService.mode = DataSourceMode.fixture;
+                  },
+                  child: const Text('Dùng dữ liệu mẫu (G0)'),
+                ),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size(110, 42)),
+                  onPressed: _openSettings,
+                  child: const Text('Đổi IP Backend'),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -273,10 +300,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.space1),
-          const Text(
-            'Thiết bị chưa gửi bản ghi nào hoặc chưa kết nối.',
+          Text(
+            'Thiết bị ${widget.apiService.deviceId} chưa gửi bản ghi nào hoặc chưa kết nối.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: AppSpacing.space4),
           OutlinedButton(

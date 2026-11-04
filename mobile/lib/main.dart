@@ -41,6 +41,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _apiService = ApiService();
+    _apiService.checkHealth();
     _fetchCachedLatest();
     _apiService.addListener(_onServiceChanged);
   }
