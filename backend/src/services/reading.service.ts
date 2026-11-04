@@ -55,7 +55,8 @@ export function computePayloadHash(dto: IngestReadingDto): string {
 export function formatUtcIso(d: Date | string | null): string | null {
   if (!d) return null;
   const dateObj = typeof d === 'string' ? new Date(d) : d;
-  return dateObj.toISOString().replace('.000Z', 'Z');
+  if (isNaN(dateObj.getTime())) return null;
+  return dateObj.toISOString();
 }
 
 export class ReadingService {
@@ -171,6 +172,10 @@ export class ReadingService {
       ? JSON.parse(row.raw_payload)
       : row.raw_payload;
 
+    if (reading && reading.recorded_at) {
+      reading.recorded_at = formatUtcIso(reading.recorded_at);
+    }
+
     let isStale: boolean | null = null;
     if (reading.recorded_at) {
       const recordedTime = new Date(reading.recorded_at).getTime();
@@ -215,10 +220,18 @@ export class ReadingService {
       [deviceId, limit]
     );
 
-    const items: HistoryItem[] = rows.map((r) => ({
-      reading: typeof r.raw_payload === 'string' ? JSON.parse(r.raw_payload) : r.raw_payload,
-      received_at: formatUtcIso(r.received_at)!,
-    }));
+    const items: HistoryItem[] = rows.map((r) => {
+      const reading: IngestReadingDto = typeof r.raw_payload === 'string'
+        ? JSON.parse(r.raw_payload)
+        : r.raw_payload;
+      if (reading && reading.recorded_at) {
+        reading.recorded_at = formatUtcIso(reading.recorded_at);
+      }
+      return {
+        reading,
+        received_at: formatUtcIso(r.received_at)!,
+      };
+    });
 
     return {
       device_id: deviceId,
