@@ -51,7 +51,7 @@ constexpr unsigned long READ_INTERVAL_MS = 2500; // DHT22 đọc cách nhau >= 2
 
 // =============== WIFI CONFIGURATION ===============
 
-const char* WIFI_SSID = "Redme Note 11";
+const char* WIFI_SSID = "Redmi Note 11";
 const char* WIFI_PASSWORD = "Ngoc0706@";
 
 // =============== THINGSPEAK CONFIGURATION ===============
