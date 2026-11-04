@@ -2,6 +2,10 @@
 
 Dự án MVP IoT theo dõi và hỗ trợ chăm sóc cây ớt con trong vườn ươm.
 
+## Phạm vi MVP G0
+
+Một ESP32 đọc năm cảm biến: DHT22, HD‑38, DS18B20, TDS Meter V1.0 và pH PH‑4502C. TDS/pH đo mẫu nước hoặc dung dịch; giá trị quy đổi chỉ được coi là hợp lệ sau hiệu chuẩn. Hồ sơ G0 v0.1 gồm [phạm vi và kiến trúc](docs/architecture/mvp-scope.md), [pin map](docs/hardware/pin-map.md), [hợp đồng dữ liệu](docs/contracts/sensor-reading.md), [API](docs/contracts/api.md), [ma trận thử](docs/integration/test-matrix.md) và [bảng xác nhận bàn giao](docs/integration/g0-handoff.md). Hồ sơ đang chờ các thành viên xác nhận và kiểm tra mạch thật.
+
 ## Cấu trúc thư mục
 
 ```text
@@ -36,7 +40,7 @@ Mỗi thư mục thành viên chứa file Markdown mô tả trách nhiệm, đ�
 
 | Thành viên | Phụ trách | Branch |
 | --- | --- | --- |
-| TKiet | Kiến trúc, phần cứng và tích hợp | Không tạo branch riêng |
+| TKiet | Kiến trúc, phần cứng và tích hợp | `TKiet` |
 | QTien | ESP32, cảm biến và hiệu chuẩn | `QTien` |
 | TVan | ESP32, Wi‑Fi và truyền dữ liệu | `TVan` |
 | TDat | Backend, API và cơ sở dữ liệu | `TDat` |
@@ -48,7 +52,7 @@ Ngoài các branch thành viên, dự án có:
 
 - `main`: phiên bản chính thức, chứa đầy đủ tài liệu.
 - `dev`: branch phát triển/tích hợp, chứa đầy đủ tài liệu.
-- Các branch thành viên: README chung và file Markdown được giao cho thành viên tương ứng.
+- Các branch thành viên: lưu mã và tài liệu thuộc phần việc được giao; Pull Request vào `dev` để tích hợp.
 
 ## Quy trình làm việc
 

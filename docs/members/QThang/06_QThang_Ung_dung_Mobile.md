@@ -1,5 +1,7 @@
 # 06 — QThang: Ứng dụng mobile
 
+**Phạm vi G0 v0.1:** ứng dụng hiển thị đủ năm cảm biến theo `docs/contracts/api.md` và fixture trong `docs/contracts/fixtures/`; pH/TDS là phép đo mẫu nước/dung dịch. Chỉ hiển thị kết quả quy tắc do backend trả sau khi MThuy duyệt.
+
 **Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT  
 **Người phụ trách chính:** QThang  
 **Trách nhiệm chính:** Xây dựng ứng dụng mobile để xem số đo, lịch sử, trạng thái và cảnh báo theo API đã thống nhất.  
@@ -7,7 +9,7 @@
 
 ## 1. Kết quả cần bàn giao
 
-Một ứng dụng mobile xem số đo vườn ươm qua API backend: **nhiệt độ không khí, độ ẩm không khí, nhiệt độ đất, độ ẩm đất**, thiết bị, thời điểm đo/cập nhật, lịch sử và trạng thái/cảnh báo theo phạm vi MVP đã chốt. Ứng dụng phải cho biết khi nào dữ liệu chưa có, lỗi cảm biến, chưa hiệu chuẩn, đã cũ hoặc không lấy được từ server; không hiển thị số đo cũ như dữ liệu vừa đo.
+Một ứng dụng mobile xem **nhiệt độ/độ ẩm không khí, nhiệt độ/độ ẩm đất, TDS và pH mẫu nước/dung dịch**, thiết bị, thời điểm đo/cập nhật, lịch sử và trạng thái/cảnh báo. Ứng dụng phải phân biệt dữ liệu chưa có, lỗi cảm biến, chưa hiệu chuẩn, đã cũ và lỗi server.
 
 ### Ranh giới sở hữu
 
@@ -21,7 +23,7 @@ Một ứng dụng mobile xem số đo vườn ươm qua API backend: **nhiệt 
 
 ## 2. Hợp đồng đầu vào để làm song song
 
-Tại **Phase 0 (G0)**, TDat bàn giao response mẫu cho: thiết bị chưa có dữ liệu, mẫu mới hợp lệ, một cảm biến lỗi, HD‑38 chưa hiệu chuẩn, dữ liệu cũ, lịch sử nhiều bản ghi và lỗi server. QThang cùng DKhoa thống nhất tên gọi, đơn vị, ý nghĩa trạng thái, thời gian đo/nhận và tiêu chí dữ liệu cũ. Chọn nền tảng/phương án build mobile cùng TKiet theo thiết bị nhóm có thể dùng để thử và demo; ghi rõ phiên bản công cụ trong README.
+Tại **Phase 0 (G0)**, TDat bàn giao response mẫu cho: thiết bị chưa có dữ liệu, mẫu mới hợp lệ, một cảm biến lỗi, HD‑38/TDS/pH chưa hiệu chuẩn, dữ liệu cũ, lịch sử nhiều bản ghi và lỗi server. QThang cùng DKhoa thống nhất tên gọi, đơn vị, ý nghĩa trạng thái, thời gian đo/nhận và tiêu chí dữ liệu cũ. Chọn nền tảng/phương án build mobile cùng TKiet theo thiết bị nhóm có thể dùng để thử và demo; ghi rõ phiên bản công cụ trong README.
 
 | Trường hợp | Ứng dụng cần thể hiện |
 | --- | --- |
@@ -29,11 +31,11 @@ Tại **Phase 0 (G0)**, TDat bàn giao response mẫu cho: thiết bị chưa c�
 | Chưa có bản ghi | Hiện “Chưa có dữ liệu”, không tự tạo số `0` hay lịch sử giả |
 | Số đo mới, hợp lệ | Hiện giá trị, đơn vị, thiết bị và thời gian theo quy tắc G0 |
 | Một cảm biến lỗi | Hiện nguyên nhân/trạng thái ở ô đó; các ô hợp lệ khác vẫn hiển thị |
-| HD‑38 chưa hiệu chuẩn | Không gắn `%` cho số đọc thô và không đưa độ ẩm đất % giả vào lời khuyên |
+| HD‑38/TDS/pH chưa hiệu chuẩn | Không gắn %, ppm hoặc pH cho số thô và không đưa giá trị quy đổi giả vào lời khuyên |
 | Dữ liệu cũ / thiết bị mất liên lạc | Gắn nhãn “Dữ liệu cũ” và lần cập nhật cuối; nếu có bản lưu trên máy, ghi rõ đó là bản đã lưu |
 | Số đo hợp lệ bằng `0` | Hiện `0` như giá trị thật, phân biệt với `null` hoặc cảm biến lỗi |
 
-Các tên trường trong file 01 (`device_id`, `recorded_at`, `air_temperature_c`, `air_humidity_pct`, `soil_temperature_c`, `soil_moisture_raw`, `soil_moisture_pct`, `sensor_status`) là **khung thảo luận**, chưa phải schema đã duyệt. QThang chỉ triển khai theo `docs/contracts/api.md` sau G0. Cần hỏi TDat cách truy vấn lịch sử/thiết bị, phân biệt thời điểm đo với thời điểm server nhận, múi giờ hiển thị và thời gian làm mới. Không tự đặt ngưỡng chăm sóc hoặc suy ra “thiết bị đang hoạt động” chỉ vì điện thoại còn giữ số đo cũ.
+Schema đề xuất G0 v0.1 nằm trong `docs/contracts/api.md` và `docs/contracts/sensor-reading.md`; QThang xác nhận với TDat trước khi triển khai. Phân biệt thời điểm đo với thời điểm server nhận, múi giờ hiển thị và dữ liệu cũ. Không tự đặt ngưỡng chăm sóc hoặc suy ra “thiết bị đang hoạt động” chỉ vì điện thoại còn giữ số đo cũ.
 
 **Cách làm song song:** Dựng màn hình với fixture đúng response G0; đặt việc lấy dữ liệu trong một lớp API/adapter để chuyển sang backend thật mà không viết lại màn hình. DKhoa làm web và TDat làm backend độc lập; hai giao diện cùng dùng fixture để đối chiếu ngữ nghĩa, không cần chia sẻ mã ứng dụng.
 
@@ -77,7 +79,7 @@ Các tên trường trong file 01 (`device_id`, `recorded_at`, `air_temperature_
 **QThang thực hiện:**
 
 - Cùng TDat gọi API thật trên điện thoại/trình giả lập; so sánh số đo, đơn vị, thời điểm, thứ tự lịch sử và mã thiết bị với response. Cùng TKiet kiểm tra một lần đo thật từ ESP32 tới ứng dụng.
-- Thử các ca chưa có bản ghi, cảm biến lỗi một phần, HD‑38 chưa hiệu chuẩn, dữ liệu cũ, mất mạng rồi nối lại, backend không phản hồi và có số đo mới sau khi Wi‑Fi ESP32 hồi phục.
+- Thử các ca chưa có bản ghi, cảm biến lỗi một phần, HD‑38/TDS/pH chưa hiệu chuẩn, dữ liệu cũ, mất mạng rồi nối lại, backend không phản hồi và có số đo mới sau khi Wi‑Fi ESP32 hồi phục.
 - Cùng DKhoa đối chiếu cùng bản ghi trên web/mobile; ghi issue có response, ảnh màn hình, kết quả mong đợi và người nhận nếu cách hiển thị khác nhau.
 
 **Đầu ra:** Biên bản tích hợp mobile, ảnh màn hình theo ca thử và danh sách issue.  
@@ -110,7 +112,7 @@ Các tên trường trong file 01 (`device_id`, `recorded_at`, `air_temperature_
 - [ ] Mã ứng dụng, fixture và hướng dẫn nằm trong `mobile/`; có cấu hình API cho điện thoại thật.
 - [ ] Có màn hình cho số đo mới nhất, lịch sử và trạng thái thiết bị theo phạm vi G0.
 - [ ] Có fixture cho bình thường, chưa có dữ liệu, lỗi một cảm biến, chưa hiệu chuẩn, dữ liệu cũ và lỗi server.
-- [ ] Giá trị `0` hợp lệ khác `null`; số đọc thô HD‑38 không được gắn `%` nếu chưa hiệu chuẩn.
+- [ ] Giá trị `0` hợp lệ khác `null`; số đọc thô HD‑38/TDS/pH không được gắn %, ppm hoặc pH nếu chưa hiệu chuẩn.
 - [ ] Thời điểm đo/nhận và dữ liệu cũ/bản lưu trên máy được ghi nhãn đúng hợp đồng.
 - [ ] Nội dung chăm sóc do MThuy duyệt; không có ngưỡng hoặc thông báo đẩy tự thêm ngoài phạm vi.
 - [ ] TDat xác nhận response/API, DKhoa xác nhận ngữ nghĩa trạng thái, TKiet xác nhận luồng đo thật tới mobile.

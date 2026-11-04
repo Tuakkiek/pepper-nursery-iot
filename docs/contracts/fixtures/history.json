@@ -1,0 +1,56 @@
+{
+  "device_id": "esp32-nursery-01",
+  "limit": 20,
+  "readings": [
+    {
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "sample-0002",
+        "recorded_at": null,
+        "air_temperature_c": 28.2,
+        "air_humidity_pct": 72.0,
+        "soil_temperature_c": 27.1,
+        "soil_moisture_raw": 1800,
+        "soil_moisture_pct": null,
+        "water_tds_adc_raw": 1560,
+        "water_tds_ppm": null,
+        "water_ph_adc_raw": 1930,
+        "water_ph": null,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "not_calibrated",
+          "ds18b20": "ok",
+          "tds": "not_calibrated",
+          "ph4502c": "not_calibrated"
+        }
+      },
+      "received_at": "2026-11-04T08:01:02Z"
+    },
+    {
+      "reading": {
+        "schema_version": "0.1",
+        "device_id": "esp32-nursery-01",
+        "sample_id": "sample-0001",
+        "recorded_at": "2026-11-04T08:00:00Z",
+        "air_temperature_c": 28.2,
+        "air_humidity_pct": 72.0,
+        "soil_temperature_c": 27.1,
+        "soil_moisture_raw": 1800,
+        "soil_moisture_pct": 46.0,
+        "water_tds_adc_raw": 1560,
+        "water_tds_ppm": 620.0,
+        "water_ph_adc_raw": 1930,
+        "water_ph": 6.4,
+        "sensor_status": {
+          "dht22": "ok",
+          "hd38": "ok",
+          "ds18b20": "ok",
+          "tds": "ok",
+          "ph4502c": "ok"
+        }
+      },
+      "received_at": "2026-11-04T08:00:02Z"
+    }
+  ]
+}
