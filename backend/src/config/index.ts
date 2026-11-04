@@ -13,5 +13,12 @@ export const config = {
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   },
   staleThresholdMinutes: parseInt(process.env.STALE_THRESHOLD_MINUTES || '5', 10),
+  thingspeak: {
+    enabled: process.env.THINGSPEAK_ENABLED !== 'false',
+    channelId: process.env.THINGSPEAK_CHANNEL_ID || '3543608',
+    readApiKey: process.env.THINGSPEAK_READ_API_KEY || 'EB9BC5UY233Z23O4',
+    deviceId: process.env.THINGSPEAK_DEVICE_ID || 'esp32-nursery-01',
+    pollIntervalMs: parseInt(process.env.THINGSPEAK_POLL_INTERVAL_MS || '20000', 10),
+  },
 };
 

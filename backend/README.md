@@ -38,6 +38,13 @@ DB_NAME=defaultdb
 DB_SSL=true
 
 STALE_THRESHOLD_MINUTES=5
+
+# ThingSpeak Integration (Tùy chọn ghi nhận qua ThingSpeak)
+THINGSPEAK_ENABLED=true
+THINGSPEAK_CHANNEL_ID=3543608
+THINGSPEAK_READ_API_KEY=EB9BC5UY233Z23O4
+THINGSPEAK_DEVICE_ID=esp32-nursery-01
+THINGSPEAK_POLL_INTERVAL_MS=20000
 ```
 
 ### Bước 3: Khởi tạo bảng và Nạp dữ liệu mẫu (G0 Fixtures)
@@ -150,4 +157,25 @@ Các bạn có thể phát triển giao diện độc lập mà không cần ch�
   * **409 Conflict:** Cùng `sample_id` nhưng nội dung payload bị thay đổi (`sample_conflict`).
   * **400 Bad Request:** Payload sai schema, thiếu 5 trạng thái cảm biến hoặc sai kiểu dữ liệu (`invalid_reading`).
   * **500 Server Error:** Lỗi máy chủ tạm thời (`server_error`).
+
+---
+
+### 4.3. Tích hợp ThingSpeak làm trạm trung gian (Ghi/Nhận)
+Hệ thống hỗ trợ cơ chế ESP32 gửi lên ThingSpeak và Backend tự động đồng bộ về MySQL Aiven:
+
+* **Channel ID:** `3543608`
+* **API Read:** `EB9BC5UY233Z23O4`
+* **Ánh xạ 8 Fields:**
+  * Field 1: `air_temperature_c` (Nhiệt độ không khí °C)
+  * Field 2: `air_humidity_pct` (Độ ẩm không khí %)
+  * Field 3: `soil_temperature_c` (Nhiệt độ đầu dò °C)
+  * Field 4: `soil_moisture_pct` (Độ ẩm đất %)
+  * Field 5: `water_ph` (Độ pH)
+  * Field 6: `water_tds_ppm` (Chỉ số TDS ppm)
+  * Field 7: `soil_moisture_raw` (Giá trị ADC cảm biến đất)
+  * Field 8: `water_ph_adc_raw` (Giá trị ADC cảm biến pH)
+* **Cơ chế hoạt động:**
+  * Backend chạy một tiến trình ngầm (polling worker) mỗi 20 giây gọi API Read của ThingSpeak để lấy các feed mới nhất.
+  * Mỗi feed được chuyển đổi thành bản ghi chuẩn của hệ thống (`sample_id: ts-entry-{id}`) và tự động lưu vào MySQL trên Aiven.
+  * **Kích hoạt đồng bộ thủ công:** Gửi `POST /api/v1/sync/thingspeak` để kích hoạt đồng bộ ngay lập tức mà không cần chờ chu kỳ 20s.
 
