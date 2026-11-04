@@ -31,6 +31,15 @@ class SensorStatus {
     'tds': tds,
     'ph4502c': ph4502c,
   };
+
+  bool get isDht22Ok => dht22 == 'ok';
+  bool get isHd38Ok => hd38 == 'ok';
+  bool get isHd38NotCalibrated => hd38 == 'not_calibrated';
+  bool get isDs18b20Ok => ds18b20 == 'ok';
+  bool get isTdsOk => tds == 'ok';
+  bool get isTdsNotCalibrated => tds == 'not_calibrated';
+  bool get isPhOk => ph4502c == 'ok';
+  bool get isPhNotCalibrated => ph4502c == 'not_calibrated';
 }
 
 class ReadingData {
@@ -95,17 +104,25 @@ class LatestReadingResponse {
   final ReadingData? reading;
   final DateTime? receivedAt;
   final bool? isStale;
-  final String? advice;
+  final String? adviceMessage;
 
   const LatestReadingResponse({
     required this.deviceId,
     this.reading,
     this.receivedAt,
     this.isStale,
-    this.advice,
+    this.adviceMessage,
   });
 
   factory LatestReadingResponse.fromJson(Map<String, dynamic> json) {
+    String? message;
+    final adviceVal = json['advice'];
+    if (adviceVal is String) {
+      message = adviceVal;
+    } else if (adviceVal is Map<String, dynamic>) {
+      message = adviceVal['message'] as String?;
+    }
+
     return LatestReadingResponse(
       deviceId: json['device_id'] as String? ?? '',
       reading: json['reading'] != null
@@ -115,8 +132,50 @@ class LatestReadingResponse {
           ? DateTime.tryParse(json['received_at'] as String)
           : null,
       isStale: json['is_stale'] as bool?,
-      advice: json['advice'] as String?,
+      adviceMessage: message,
     );
   }
 }
 
+class HistoryItem {
+  final ReadingData reading;
+  final DateTime? receivedAt;
+
+  const HistoryItem({
+    required this.reading,
+    this.receivedAt,
+  });
+
+  factory HistoryItem.fromJson(Map<String, dynamic> json) {
+    final readingJson = (json['reading'] as Map<String, dynamic>?) ?? json;
+    return HistoryItem(
+      reading: ReadingData.fromJson(readingJson),
+      receivedAt: json['received_at'] != null
+          ? DateTime.tryParse(json['received_at'] as String)
+          : null,
+    );
+  }
+}
+
+class HistoryResponse {
+  final String deviceId;
+  final int limit;
+  final List<HistoryItem> readings;
+
+  const HistoryResponse({
+    required this.deviceId,
+    required this.limit,
+    required this.readings,
+  });
+
+  factory HistoryResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['readings'] as List<dynamic>?) ?? [];
+    return HistoryResponse(
+      deviceId: json['device_id'] as String? ?? '',
+      limit: (json['limit'] as num?)?.toInt() ?? 20,
+      readings: list
+          .map((item) => HistoryItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

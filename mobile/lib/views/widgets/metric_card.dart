@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 
 enum MetricState {
-  normal,
-  uncalibrated,
-  error,
-  missing,
+  normal,        // Mới, hợp lệ: teal.soft / brand.teal, text navy
+  uncalibrated,  // Chưa hiệu chuẩn: teal.soft / viền brand.teal, text navy
+  error,         // Lỗi cảm biến: coral.soft / brand.coral, text coral.strong
+  missing,       // Chưa có dữ liệu: surface / viền border, text textSecondary
 }
 
 class MetricCard extends StatelessWidget {
@@ -16,6 +16,7 @@ class MetricCard extends StatelessWidget {
   final String statusText;
   final IconData icon;
   final String? subtitle;
+  final String? timestamp;
 
   const MetricCard({
     super.key,
@@ -26,19 +27,20 @@ class MetricCard extends StatelessWidget {
     required this.statusText,
     required this.icon,
     this.subtitle,
+    this.timestamp,
   });
 
   @override
   Widget build(BuildContext context) {
     Color badgeBg;
     Color badgeTextColor;
-    Border? border;
+    Border border;
 
     switch (state) {
       case MetricState.normal:
         badgeBg = AppColors.tealSoft;
         badgeTextColor = AppColors.navy;
-        border = Border.all(color: AppColors.border, width: 1);
+        border = Border.all(color: AppColors.border, width: 1.0);
         break;
       case MetricState.uncalibrated:
         badgeBg = AppColors.tealSoft;
@@ -53,59 +55,65 @@ class MetricCard extends StatelessWidget {
       case MetricState.missing:
         badgeBg = AppColors.cream;
         badgeTextColor = AppColors.textSecondary;
-        border = Border.all(color: AppColors.border, width: 1);
+        border = Border.all(color: AppColors.border, width: 1.0);
         break;
     }
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         border: border,
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.space4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tiêu đề + icon
+          // 1. Tên số đo + icon
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
                     fontSize: 14,
+                    height: 20 / 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
                 ),
               ),
-              Icon(icon, size: 20, color: AppColors.teal),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.tealSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 18, color: AppColors.navy),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.space3),
 
-          // Giá trị lớn + Đơn vị (tabular numbers)
+          // 2. Giá trị lớn + Đơn vị (tabular figures)
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 displayValue ?? '—',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.navy,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
+                style: AppTypography.metricValue,
               ),
               if (displayValue != null && unit.isNotEmpty) ...[
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.space1),
                 Text(
                   unit,
                   style: const TextStyle(
                     fontSize: 16,
+                    height: 24 / 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
@@ -113,31 +121,42 @@ class MetricCard extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.space2),
 
-          // Nhãn trạng thái
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: badgeBg,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              statusText,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: badgeTextColor,
+          // 3. Nhãn trạng thái
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusText,
+                  style: AppTypography.badge.copyWith(color: badgeTextColor),
+                ),
               ),
-            ),
+              if (subtitle != null) ...[
+                const SizedBox(width: AppSpacing.space2),
+                Expanded(
+                  child: Text(
+                    subtitle!,
+                    style: AppTypography.caption.copyWith(fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ],
           ),
 
-          if (subtitle != null) ...[
-            const SizedBox(height: 6),
+          // 4. Thời điểm đo / cập nhật
+          if (timestamp != null) ...[
+            const SizedBox(height: AppSpacing.space2),
             Text(
-              subtitle!,
+              timestamp!,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -147,4 +166,3 @@ class MetricCard extends StatelessWidget {
     );
   }
 }
-

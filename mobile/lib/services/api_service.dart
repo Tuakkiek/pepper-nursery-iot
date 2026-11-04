@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../models/sensor_reading.dart';
@@ -7,27 +8,62 @@ enum DataSourceMode { fixture, live }
 
 enum FixtureScenario {
   normal('latest-normal.json', 'Bình thường (Đủ 5 cảm biến)'),
-  partialError('latest-partial-error.json', 'Lỗi một phần cảm biến'),
+  partialError('latest-partial-error.json', 'Lỗi một phần cảm biến (DHT22, TDS)'),
   uncalibrated('latest-uncalibrated.json', 'Chưa hiệu chuẩn (HD-38, TDS, pH)'),
-  stale('latest-stale.json', 'Dữ liệu cũ (Mất liên lạc)'),
-  empty('latest-empty.json', 'Chưa có dữ liệu'),
-  serverError('server-error.json', 'Lỗi máy chủ');
+  stale('latest-stale.json', 'Dữ liệu cũ (Mất liên lạc > 5 phút)'),
+  empty('latest-empty.json', 'Chưa có bản ghi nào'),
+  serverError('server-error.json', 'Lỗi máy chủ (500)');
 
   final String filename;
   final String label;
   const FixtureScenario(this.filename, this.label);
 }
 
-class ApiService {
-  DataSourceMode mode = DataSourceMode.fixture;
-  FixtureScenario currentScenario = FixtureScenario.normal;
-  String baseUrl = 'http://10.0.2.2:3000'; // Default Android emulator backend URL
+class ApiService extends ChangeNotifier {
+  DataSourceMode _mode = DataSourceMode.fixture;
+  FixtureScenario _currentScenario = FixtureScenario.normal;
+  String _baseUrl = 'http://10.0.2.2:3000'; // Mặc định emulator Android
+  String _deviceId = 'esp32-nursery-01';
 
-  Future<LatestReadingResponse> fetchLatestReading(String deviceId) async {
-    if (mode == DataSourceMode.fixture) {
-      return _loadFixture(currentScenario.filename);
+  DataSourceMode get mode => _mode;
+  FixtureScenario get currentScenario => _currentScenario;
+  String get baseUrl => _baseUrl;
+  String get deviceId => _deviceId;
+
+  set mode(DataSourceMode val) {
+    if (_mode != val) {
+      _mode = val;
+      notifyListeners();
+    }
+  }
+
+  set currentScenario(FixtureScenario val) {
+    if (_currentScenario != val) {
+      _currentScenario = val;
+      notifyListeners();
+    }
+  }
+
+  set baseUrl(String val) {
+    if (_baseUrl != val) {
+      _baseUrl = val;
+      notifyListeners();
+    }
+  }
+
+  set deviceId(String val) {
+    if (_deviceId != val) {
+      _deviceId = val;
+      notifyListeners();
+    }
+  }
+
+  /// Lấy số đo mới nhất theo endpoint GET /api/v1/devices/{device_id}/readings/latest
+  Future<LatestReadingResponse> fetchLatestReading() async {
+    if (_mode == DataSourceMode.fixture) {
+      return _loadFixture(_currentScenario.filename);
     } else {
-      return _fetchFromApi(deviceId);
+      return _fetchFromApi();
     }
   }
 
@@ -37,45 +73,45 @@ class ApiService {
     final data = jsonDecode(jsonStr);
 
     if (filename == 'server-error.json') {
-      throw Exception(data['error']?['message'] ?? 'Lỗi kết nối máy chủ');
+      final msg = data['error']?['message'] ?? 'Lỗi kết nối máy chủ';
+      throw Exception(msg);
     }
 
     return LatestReadingResponse.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<LatestReadingResponse> _fetchFromApi(String deviceId) async {
-    final uri = Uri.parse('$baseUrl/api/devices/$deviceId/latest');
-    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+  Future<LatestReadingResponse> _fetchFromApi() async {
+    final uri = Uri.parse('$_baseUrl/api/v1/devices/$_deviceId/readings/latest');
+    final response = await http.get(uri).timeout(const Duration(seconds: 8));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return LatestReadingResponse.fromJson(data as Map<String, dynamic>);
+    } else if (response.statusCode == 404) {
+      throw Exception('Thiết bị không tồn tại ($_deviceId)');
     } else {
-      throw Exception('Không tải được dữ liệu: mã lỗi ${response.statusCode}');
+      throw Exception('Lỗi máy chủ: mã phản hồi ${response.statusCode}');
     }
   }
 
-  Future<List<ReadingData>> fetchHistory(String deviceId) async {
-    if (mode == DataSourceMode.fixture) {
+  /// Lấy danh sách lịch sử theo endpoint GET /api/v1/devices/{device_id}/readings?limit=20
+  Future<List<HistoryItem>> fetchHistory({int limit = 20}) async {
+    if (_mode == DataSourceMode.fixture) {
       final jsonStr = await rootBundle.loadString('assets/fixtures/history.json');
       final data = jsonDecode(jsonStr);
-      final list = (data['readings'] as List<dynamic>?) ?? [];
-      return list
-          .map((item) => ReadingData.fromJson(item as Map<String, dynamic>))
-          .toList();
+      final historyResponse = HistoryResponse.fromJson(data as Map<String, dynamic>);
+      return historyResponse.readings;
     } else {
-      final uri = Uri.parse('$baseUrl/api/devices/$deviceId/history');
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final uri = Uri.parse('$_baseUrl/api/v1/devices/$_deviceId/readings?limit=$limit');
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final list = (data['readings'] as List<dynamic>?) ?? [];
-        return list
-            .map((item) => ReadingData.fromJson(item as Map<String, dynamic>))
-            .toList();
+        final historyResponse = HistoryResponse.fromJson(data as Map<String, dynamic>);
+        return historyResponse.readings;
       } else {
         throw Exception('Không tải được lịch sử: ${response.statusCode}');
       }
     }
   }
 }
-
