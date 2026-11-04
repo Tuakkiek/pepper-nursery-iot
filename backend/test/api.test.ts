@@ -149,8 +149,37 @@ async function runTests() {
       console.log('✓ POST invalid reading (400 Bad Request) passed');
     }
 
+    // 10. Test GET /api/v1/sync/thingspeak/status
+    {
+      const res = await request('/api/v1/sync/thingspeak/status');
+      console.assert(res.status === 200, `ThingSpeak status expected 200, got ${res.status}`);
+      console.assert(res.body.data.channelId === '3543608', 'Channel ID should be 3543608');
+      console.log('✓ GET ThingSpeak sync status passed');
+    }
+
+    // 11. Test Rule Engine Evaluation (when toggled on/off)
+    {
+      const { ruleService } = await import('../src/services/rule.service');
+      // Default: disabled -> advice null
+      const resDefault = await request('/api/v1/devices/esp32-nursery-01/readings/latest');
+      console.assert(resDefault.body.advice === null, 'advice should be null when disabled');
+
+      // Enable temporarily
+      ruleService.setEnabled(true);
+      const resEnabled = await request('/api/v1/devices/esp32-nursery-01/readings/latest');
+      console.assert(resEnabled.body.advice !== null, 'advice should not be null when enabled');
+      console.assert(typeof resEnabled.body.advice.status === 'string', 'advice should have status string');
+      console.assert(typeof resEnabled.body.advice.message === 'string', 'advice should have message string');
+
+      // Restore to disabled (conforming to G0 v0.1 draft)
+      ruleService.setEnabled(false);
+      const resRestored = await request('/api/v1/devices/esp32-nursery-01/readings/latest');
+      console.assert(resRestored.body.advice === null, 'advice should be restored to null');
+      console.log('✓ Rule Engine advice evaluation (enabled & disabled modes) passed');
+    }
+
     console.log('=======================================');
-    console.log(' ALL 9 INTEGRATION TESTS PASSED 100%! ');
+    console.log(' ALL 11 INTEGRATION TESTS PASSED 100%! ');
     console.log('=======================================');
   } finally {
     server.close();

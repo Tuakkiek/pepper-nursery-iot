@@ -13,6 +13,14 @@ apiRouter.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ThingSpeak status endpoint
+apiRouter.get('/sync/thingspeak/status', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    data: thingSpeakService.getStatus(),
+  });
+});
+
 // Manual trigger for ThingSpeak sync
 apiRouter.post('/sync/thingspeak', async (req, res) => {
   try {
