@@ -64,16 +64,16 @@ Dự án sử dụng Node.js thuần, **không cần cài đặt thêm bất k�
 cd web
 npm start
 ```
-Mở trình duyệt truy cập: **`http://localhost:3000`** (Dashboard tự động kết nối Backend tại `http://localhost:8000`)
+Mở trình duyệt truy cập: **`http://localhost:3000`** (Dashboard tự động kết nối Backend tại `https://pepper-nursery-iot.onrender.com`)
 
 ---
 
 ## 4. Tích hợp với Backend thật của TDat (Phase 2 & Phase 3)
 
 ### 4.1. Quy trình kết nối
-1. Đảm bảo Backend của TDat đang chạy (tại `http://localhost:8000`).
+1. Backend của TDat được triển khai trên cloud: `https://pepper-nursery-iot.onrender.com`.
 2. Trên Web Dashboard:
-   - Mục **"Nguồn dữ liệu"**: Chọn **"🌐 API Thật (Backend TDat: 8000)"**.
+   - Mục **"Nguồn dữ liệu"**: Chọn **"🌐 API Thật (Backend Cloud: Render)"**.
    - Mục **"Thiết bị"**: Chọn trạm cần theo dõi:
      * `esp32-nursery-01`: Trạm vườn ươm chuẩn (đọc số đo hợp lệ mới nhất).
      * `esp32-stale-01`: Trạm mô phỏng mất kết nối (kiểm thử cờ `is_stale: true`).
