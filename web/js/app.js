@@ -47,7 +47,7 @@ class NurseryDashboardApp {
   }
 
   async init() {
-    // 1. Tải cấu hình từ runtime / .env nếu có
+    // 1. Cố định cấu hình trực tiếp từ APP_CONFIG (không gọi server local)
     await loadRuntimeConfig();
     this.adapter.setMode(APP_CONFIG.dataMode);
     this.adapter.setApiBaseUrl(APP_CONFIG.apiBaseUrl);
@@ -234,7 +234,7 @@ class NurseryDashboardApp {
     } else {
       this.el.fixtureBanner.style.display = 'flex';
       this.el.fixtureBannerText.innerHTML = `
-        <strong>Kết nối Backend thật:</strong> Đang gọi API tại <code>${this.adapter.apiBaseUrl}</code> · Thiết bị: <code>${this.adapter.deviceId}</code>.
+        <strong>Kết nối Backend:</strong> Đang kết nối trực tiếp Cloud Backend tại <code>${this.adapter.apiBaseUrl}</code> · Thiết bị: <code>${this.adapter.deviceId}</code>.
       `;
     }
   }

@@ -6,7 +6,7 @@
 
 const assert = require('assert');
 
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
+const BASE_URL = process.env.API_BASE_URL || 'https://pepper-nursery-iot.onrender.com';
 
 async function testBackendIntegration() {
   console.log(`====================================================`);

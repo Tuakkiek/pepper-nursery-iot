@@ -11,7 +11,7 @@ export class ApiAdapter {
   constructor(config = APP_CONFIG) {
     this.mode = config.dataMode || 'REAL_API';
     this.scenario = config.currentScenario || 'normal';
-    this.apiBaseUrl = (config.apiBaseUrl || 'http://localhost:8000').replace(/\/+$/, '');
+    this.apiBaseUrl = (config.apiBaseUrl || 'https://pepper-nursery-iot.onrender.com').replace(/\/+$/, '');
     this.deviceId = config.defaultDeviceId || 'esp32-nursery-01';
   }
 

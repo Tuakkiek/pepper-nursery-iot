@@ -1,11 +1,13 @@
 /**
  * Pepper Nursery IoT - Cấu hình Web Dashboard
  * Trách nhiệm: DKhoa (05_DKhoa_Web_Dashboard.md)
- * Hỗ trợ đồng bộ cấu hình runtime từ server và môi trường
+ * Sử dụng trực tiếp Backend Cloud của toàn bộ dự án trên Render (không qua server local)
  */
 
+export const BACKEND_URL = 'https://pepper-nursery-iot.onrender.com';
+
 export const APP_CONFIG = {
-  // Chế độ nguồn dữ liệu: 'REAL_API' (khi kết nối Backend TDat) hoặc 'FIXTURE' (chạy dữ liệu mẫu)
+  // Chế độ nguồn dữ liệu: 'REAL_API' kết nối Backend Render của dự án
   dataMode: 'REAL_API',
 
   // Kịch bản fixture mặc định khi ở chế độ FIXTURE
@@ -22,8 +24,8 @@ export const APP_CONFIG = {
     { id: 'esp32-unknown', name: 'ESP32 Không tồn tại (Kiểm tra lỗi 404)' }
   ],
 
-  // Base URL của Backend TDat (Đang chạy tại http://localhost:8000)
-  apiBaseUrl: 'http://localhost:8000',
+  // Base URL của Backend chính thức trên Render (Cloud)
+  apiBaseUrl: BACKEND_URL,
 
   // Chu kỳ tự động làm mới từ API thật (10 giây)
   autoRefreshIntervalMs: 10000,
@@ -36,20 +38,8 @@ export const APP_CONFIG = {
 };
 
 /**
- * Tải cấu hình từ endpoint /api/config của server.js nếu có
+ * Trả về cấu hình cố định trực tiếp từ frontend, không gửi request tới server local
  */
 export async function loadRuntimeConfig() {
-  try {
-    const res = await fetch('/api/config');
-    if (res.ok) {
-      const serverConfig = await res.json();
-      if (serverConfig.apiBaseUrl) APP_CONFIG.apiBaseUrl = serverConfig.apiBaseUrl;
-      if (serverConfig.dataMode) APP_CONFIG.dataMode = serverConfig.dataMode;
-      if (serverConfig.defaultDeviceId) APP_CONFIG.defaultDeviceId = serverConfig.defaultDeviceId;
-      if (serverConfig.autoRefreshIntervalMs) APP_CONFIG.autoRefreshIntervalMs = serverConfig.autoRefreshIntervalMs;
-    }
-  } catch (_) {
-    // Sử dụng cấu hình mặc định nếu chạy trên static host không có server.js
-  }
   return APP_CONFIG;
 }

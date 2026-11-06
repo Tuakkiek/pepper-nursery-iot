@@ -56,7 +56,7 @@
         <div class="toolbar-group">
           <label for="data-mode-select" class="toolbar-label">Nguồn dữ liệu:</label>
           <select id="data-mode-select" class="select-control" style="font-weight: 600;">
-            <option value="REAL_API" selected>🌐 API Thật (Backend: 8000)</option>
+            <option value="REAL_API" selected>🌐 API Thật (Backend Cloud: Render)</option>
             <option value="FIXTURE">📦 Dữ liệu mẫu (Fixtures G0 Mock)</option>
           </select>
         </div>
@@ -76,11 +76,12 @@
           </select>
         </div>
 
-        <!-- Real API Config Group (Hiển thị khi chọn REAL_API) -->
-        <div id="api-control-group" class="toolbar-group">
-          <label for="api-url-input" class="toolbar-label">Backend URL:</label>
-          <input type="text" id="api-url-input" class="select-control" value="http://localhost:8000" placeholder="http://localhost:8000" style="width: 190px;">
-          <button id="btn-save-api-url" class="btn btn-secondary btn-sm">Cập nhật</button>
+        <!-- Real API Info Group (Cố định Backend Cloud Render của dự án) -->
+        <div id="api-control-group" class="toolbar-group" style="align-items: center;">
+          <span class="toolbar-label">Backend:</span>
+          <a href="https://pepper-nursery-iot.onrender.com/api/v1/health" target="_blank" rel="noopener noreferrer" class="badge badge-info" style="font-family: monospace; font-size: 13px; text-decoration: none; padding: 6px 12px; display: inline-flex; align-items: center; gap: 4px;" title="Nhấn để kiểm tra trạng thái Backend">
+            🌐 https://pepper-nursery-iot.onrender.com
+          </a>
         </div>
       </nav>
     </header>
@@ -88,7 +89,7 @@
     <!-- Notification Toast / Banner -->
     <aside id="fixture-banner" class="fixture-banner" role="status">
       <div id="fixture-banner-text">
-        <strong>Trạng thái kết nối:</strong> Đang kết nối Backend TDat tại <code>http://localhost:8000</code>.
+        <strong>Trạng thái kết nối:</strong> Đang kết nối Backend TDat tại <code>https://pepper-nursery-iot.onrender.com</code>.
       </div>
     </aside>
 
