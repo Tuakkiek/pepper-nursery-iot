@@ -80,8 +80,8 @@ constexpr float PH_VOLTAGE_FACTOR = (PH_R1_OHM + PH_R2_OHM) / PH_R2_OHM; // = 2.
 // Hai giá trị điện áp PO gốc (đơn vị V) khi nhúng điện cực vào dung dịch đệm pH 7 và pH 4.
 // Mặc định hiệu chuẩn theo Nernst lý thuyết (pH 7 -> 2.500V, pH 4.01 -> 2.677V).
 // Có thể thay bằng số thực tế đo từ dung dịch đệm khi cần độ chính xác cao hơn.
-constexpr float PH_VOLT_AT_7 = 2.500f;
-constexpr float PH_VOLT_AT_4 = 2.677f;
+constexpr float PH_VOLT_AT_7 = 1.656f;
+constexpr float PH_VOLT_AT_4 = 2.194f;
 
 // TDS: Hệ số kinh nghiệm; cần hiệu chuẩn bằng dung dịch TDS chuẩn.
 constexpr float TDS_CALIBRATION_FACTOR = 1.0f;
