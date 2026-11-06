@@ -6,6 +6,7 @@
 
 import { APP_CONFIG, loadRuntimeConfig } from './config.js';
 import { ApiAdapter } from './api/api-adapter.js';
+import { authService } from './auth.js';
 import { renderMetricCards } from './components/metric-card.js';
 import { renderDeviceStatus } from './components/device-status.js';
 import { renderCareAdvice } from './components/care-advice.js';
@@ -38,7 +39,8 @@ class NurseryDashboardApp {
       careAdviceContainer: document.getElementById('care-advice-container'),
       metricsContainer: document.getElementById('metrics-container'),
       historyContainer: document.getElementById('history-container'),
-      lastRefreshedLabel: document.getElementById('last-refreshed-label')
+      lastRefreshedLabel: document.getElementById('last-refreshed-label'),
+      userAuthBar: document.getElementById('user-auth-bar')
     };
 
     this.init();
@@ -51,7 +53,10 @@ class NurseryDashboardApp {
     this.adapter.setApiBaseUrl(APP_CONFIG.apiBaseUrl);
     this.adapter.setDeviceId(APP_CONFIG.defaultDeviceId);
 
-    // 2. Đồng bộ giá trị lên Form Controls
+    // 2. Hiển thị thông tin phiên đăng nhập
+    this.renderUserAuthBar();
+
+    // 3. Đồng bộ giá trị lên Form Controls
     if (this.el.dataModeSelect) this.el.dataModeSelect.value = APP_CONFIG.dataMode;
     if (this.el.apiUrlInput) this.el.apiUrlInput.value = APP_CONFIG.apiBaseUrl;
     if (this.el.deviceSelect) this.el.deviceSelect.value = APP_CONFIG.defaultDeviceId;
@@ -65,6 +70,48 @@ class NurseryDashboardApp {
 
     // 5. Khởi động chu kỳ tự động cập nhật
     this.startAutoRefresh();
+  }
+
+  renderUserAuthBar() {
+    if (!this.el.userAuthBar) return;
+    const user = authService.getUser();
+
+    if (authService.isAuthenticated() && user) {
+      const isAdmin = user.role === 'admin';
+      this.el.userAuthBar.innerHTML = `
+        <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-pill); font-size: 13px; font-weight: 600; color: var(--color-navy);">
+            <span>${isAdmin ? '🛡️' : '👤'}</span>
+            <span>${user.full_name || user.username}</span>
+            <span class="badge ${isAdmin ? 'badge-warning' : 'badge-normal'}" style="font-size: 11px; padding: 2px 6px;">${user.role}</span>
+          </div>
+
+          ${isAdmin ? `
+            <a href="admin.html" class="btn btn-primary btn-sm" title="Truy cập Trang quản trị hệ thống">
+              ⚙️ Quản trị Admin
+            </a>
+          ` : ''}
+
+          <button id="btn-dashboard-logout" class="btn btn-secondary btn-sm" title="Đăng xuất khỏi hệ thống">
+            🚪 Đăng xuất
+          </button>
+        </div>
+      `;
+
+      // Bắt sự kiện đăng xuất
+      document.getElementById('btn-dashboard-logout')?.addEventListener('click', () => {
+        if (confirm('Bạn có muốn đăng xuất?')) {
+          authService.logout();
+          this.renderUserAuthBar();
+        }
+      });
+    } else {
+      this.el.userAuthBar.innerHTML = `
+        <a href="login.html" class="btn btn-secondary btn-sm" id="btn-nav-login" title="Đăng nhập hoặc Đăng ký tài khoản">
+          🔑 Đăng nhập / Đăng ký
+        </a>
+      `;
+    }
   }
 
   bindEvents() {

@@ -29,15 +29,21 @@ Dashboard cung cấp giao diện trực quan theo dõi toàn diện 5 cảm bi�
 ```text
 web/
 ├── .env                         # Cấu hình môi trường (Port, API_BASE_URL, DATA_MODE)
-├── index.html                   # Giao diện chính ngữ nghĩa, chuẩn accessibility
+├── index.html                   # Giao diện chính Dashboard theo dõi vườn ươm
+├── login.html                   # Giao diện Đăng nhập & Đăng ký người dùng
+├── admin.html                   # Cổng Quản trị Hệ thống dành cho Role Admin
 ├── server.js                    # Web server Node.js thuần & Reverse Proxy sang Backend
 ├── package.json                 # Lệnh npm start, npm test, npm run test:integration
 ├── README.md                    # Tài liệu hướng dẫn sử dụng và bàn giao
 ├── css/
 │   ├── design-system.css        # Khai báo chuẩn tokens CSS theo Design System (Palette 4 màu gốc)
-│   └── dashboard.css            # Bố cục lưới, thẻ MetricCard, biểu đồ và trạng thái
+│   ├── dashboard.css            # Bố cục lưới, thẻ MetricCard, biểu đồ và trạng thái
+│   ├── auth.css                 # Giao diện Đăng nhập & Đăng ký chuẩn Design System
+│   └── admin.css                # Giao diện Cổng Quản trị Admin, bảng quy tắc, modal
 ├── js/
 │   ├── app.js                   # Application Controller điều phối UI, sự kiện và làm mới
+│   ├── auth.js                  # Dịch vụ Quản lý Xác thực & Phân quyền (JWT Token & Session)
+│   ├── admin.js                 # Quản trị viên: CRUD Care Rules, ThingSpeak sync, bộ lọc
 │   ├── config.js                # Cấu hình ứng dụng & tải động từ server
 │   ├── api/
 │   │   └── api-adapter.js       # Lớp Adapter: Chuyển đổi giữa Fixture và API thật (kèm ThingSpeak sync)
@@ -50,7 +56,7 @@ web/
 │       └── g0-fixtures.js       # Toàn bộ dữ liệu mô phỏng từ docs/contracts/fixtures/
 └── test/
     ├── fixture-test.js          # Kiểm thử tự động 7 quy tắc hợp đồng G0 v0.1
-    └── integration-test.js      # Kiểm thử tích hợp trực tiếp với Backend API (Phase 3)
+    └── integration-test.js      # Kiểm thử tích hợp 14 ca: API số đo, Auth và Admin Care Rules
 ```
 
 ---
@@ -115,4 +121,40 @@ Khi backend đang chạy:
 ```bash
 npm run test:integration
 ```
-Script sẽ gửi request thực tế đến tất cả các endpoint của Backend để kiểm tra tính tương thích end-to-end.
+Script kiểm tra thực tế toàn bộ 14 ca: Health check, số đo mới nhất, trạm mất kết nối, trạm rỗng, lỗi 404, lịch sử số đo, Đăng nhập Admin, Đăng nhập User, Xác thực phiên `/auth/me`, Danh sách quy tắc, Thêm quy tắc, Sửa quy tắc, Xóa quy tắc, và ThingSpeak Sync status.
+
+---
+
+## 7. Hướng dẫn sử dụng Hệ thống Xác thực (Auth) & Cổng Quản trị Admin
+
+### 7.1. Trang Đăng nhập & Đăng ký (`login.html`)
+* **Địa chỉ:** `http://localhost:3000/login.html` (hoặc nhấn nút **"🔑 Đăng nhập / Đăng ký"** tại Header trang chủ).
+* **Tài khoản thử nghiệm mặc định (nạp sẵn từ CSDL):**
+  - **Quản trị viên (Admin):** Username: `admin` | Password: `admin123`
+  - **Kỹ thuật viên (User):** Username: `user` | Password: `user123`
+* **Tính năng:**
+  - Chuyển tab nhanh giữa **Đăng nhập** và **Đăng ký tài khoản**.
+  - Nút **"Điền nhanh tài khoản thử nghiệm"** tiện lợi để trải nghiệm tức thì.
+  - Sau khi đăng nhập thành công:
+    - Nếu là role **`admin`**: Hệ thống tự động chuyển hướng đến **Trang Quản trị Admin (`admin.html`)**.
+    - Nếu là role **`user`**: Hệ thống chuyển về Dashboard theo dõi vườn ươm (`index.html`) kèm thông tin người dùng trên Header.
+  - Đăng ký tài khoản hỗ trợ phân quyền `user` hoặc `admin` theo `RegisterSchema`.
+
+### 7.2. Cổng Quản trị Hệ thống của Role Admin (`admin.html`)
+* **Địa chỉ:** `http://localhost:3000/admin.html`
+* **Cơ chế bảo vệ (Role Guard):**
+  - Chỉ người dùng có role **`admin`** và JWT token hợp lệ mới được truy cập.
+  - Người dùng chưa đăng nhập sẽ được chuyển hướng về trang `login.html`.
+  - Tài khoản role `user` sẽ bị từ chối truy cập và chuyển về `index.html`.
+* **Chức năng chính:**
+  1. **Thống kê tổng quan (KPIs):** Tổng số quy tắc, số quy tắc đang kích hoạt, trạng thái kết nối ThingSpeak Polling Worker, thời điểm lấy mẫu ngầm gần nhất.
+  2. **Quản lý Quy tắc Chăm sóc (Care Rules Management):**
+     - Hiển thị danh sách toàn bộ các quy tắc sinh học (ngưỡng nhiệt độ KK, độ ẩm KK, nhiệt độ đất, độ ẩm đất, pH nước, TDS dinh dưỡng).
+     - **Tìm kiếm & Lọc:** Tìm theo từ khóa, lọc theo loại thông số cảm biến, lọc theo mức độ (`danger`, `warning`, `info`) và lọc theo trạng thái kích hoạt.
+     - **Thêm quy tắc mới (`POST /api/v1/rules`):** Mở modal form chuẩn schema với kiểm tra dữ liệu đầu vào.
+     - **Chỉnh sửa quy tắc (`PUT /api/v1/rules/:id`):** Cập nhật ngưỡng giá trị, nội dung khuyến nghị hành động, mức độ cảnh báo.
+     - **Xóa quy tắc (`DELETE /api/v1/rules/:id`):** Hộp thoại xác nhận an toàn trước khi xóa khỏi CSDL.
+     - **Bật/Tắt nhanh trạng thái kích hoạt (`switch toggle`):** Cập nhật ngay lập tức `is_active` mà không cần reload trang.
+  3. **Đồng bộ ThingSpeak (ThingSpeak Control Center):**
+     - Giám sát thông số Channel ID `3543608`, trạm đích `esp32-nursery-01`, chu kỳ quét 20s.
+     - Kích hoạt đồng bộ tức thời (`POST /api/v1/sync/thingspeak`) ngay từ trang Admin.

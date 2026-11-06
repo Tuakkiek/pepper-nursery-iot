@@ -1,0 +1,256 @@
+/**
+ * Pepper Nursery IoT - Auth CSS (Login & Register)
+ * Tuân thủ nghiêm ngặt Design_System_Web_Mobile.md
+ * Phiên bản 1.0 - Theme sáng
+ */
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-6) var(--space-4);
+  background-color: var(--color-cream);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Card chính của Auth */
+.auth-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+/* Header thương hiệu */
+.auth-header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.auth-logo-badge {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--space-3) auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-navy);
+  color: #FFFFFF;
+  border-radius: var(--radius-control);
+  font-size: 30px;
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
+  color: var(--color-navy);
+  margin-bottom: var(--space-1);
+}
+
+.auth-subtitle {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+}
+
+/* Tabs chuyển Đăng nhập / Đăng ký */
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: var(--space-6);
+  gap: var(--space-2);
+}
+
+.auth-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: var(--space-3) 0;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  position: relative;
+  transition: color var(--transition-fast);
+  text-align: center;
+}
+
+.auth-tab-btn:hover {
+  color: var(--color-navy);
+}
+
+.auth-tab-btn.active {
+  color: var(--color-navy);
+}
+
+.auth-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--color-navy);
+  border-radius: 3px 3px 0 0;
+}
+
+/* Form inputs & labels */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+}
+
+.form-label {
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-body);
+  font-family: inherit;
+  color: var(--color-navy);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 3px var(--color-teal-soft);
+}
+
+.form-input::placeholder {
+  color: #8C9EA5;
+}
+
+.form-hint {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+/* Alert Boxes */
+.auth-alert {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-caption);
+  display: none;
+  margin-bottom: var(--space-4);
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.auth-alert.error {
+  display: flex;
+  background-color: var(--color-coral-soft);
+  border: 1px solid rgba(247, 68, 78, 0.4);
+  color: var(--color-coral-strong);
+}
+
+.auth-alert.success {
+  display: flex;
+  background-color: var(--color-teal-soft);
+  border: 1px solid var(--color-teal);
+  color: var(--color-navy);
+}
+
+/* Quick Fill Demo Section */
+.demo-accounts-box {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background-color: var(--color-cream);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.demo-accounts-title {
+  font-size: var(--font-size-small);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.demo-buttons-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.btn-demo-quick {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-navy);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.btn-demo-quick:hover {
+  background-color: var(--color-teal-soft);
+  border-color: var(--color-teal);
+}
+
+.btn-demo-quick small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* Link quay lại trang chính */
+.auth-back-link {
+  text-align: center;
+  margin-top: var(--space-4);
+}
+
+.auth-back-link a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.auth-back-link a:hover {
+  color: var(--color-navy);
+  text-decoration: underline;
+}
+
