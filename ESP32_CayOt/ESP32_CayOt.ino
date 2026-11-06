@@ -38,7 +38,7 @@
 #include <DallasTemperature.h>
 #include <math.h>
 #include <WiFi.h>
-#include <ThingSpeak.h> 
+#include <ThingSpeak.h>
 // =============== 1. KHAI BÁO GPIO ===============
 constexpr uint8_t PIN_DHT22   = 27;
 constexpr uint8_t PIN_DS18B20 = 26;
@@ -294,7 +294,7 @@ void loop() {
   // (1) DHT22: Nhiệt độ và độ ẩm không khí
   TempAndHumidity air = dht.getTempAndHumidity();
   const bool airOK = !isnan(air.temperature) && !isnan(air.humidity) && (dht.getStatus() == DHTesp::ERROR_NONE);
- 
+
   // (2) DS18B20: Nhiệt độ đầu dò (đất hoặc nước)
   ds18b20.requestTemperatures();
   float probeC = ds18b20.getTempCByIndex(0);
