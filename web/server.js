@@ -2,6 +2,7 @@
 // DKhoa - Phase 2 & 3: Kết nối API Backend của TDat
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -27,7 +28,7 @@ function loadEnv() {
 
 const env = loadEnv();
 const PORT = process.env.PORT || env.PORT || 3000;
-const API_BASE_URL = (process.env.API_BASE_URL || env.API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const API_BASE_URL = (process.env.API_BASE_URL || env.API_BASE_URL || 'https://pepper-nursery-iot.onrender.com').replace(/\/+$/, '');
 const DATA_MODE = process.env.DATA_MODE || env.DATA_MODE || 'REAL_API';
 const DEFAULT_DEVICE_ID = process.env.DEFAULT_DEVICE_ID || env.DEFAULT_DEVICE_ID || 'esp32-nursery-01';
 const AUTO_REFRESH_INTERVAL_MS = parseInt(process.env.AUTO_REFRESH_INTERVAL_MS || env.AUTO_REFRESH_INTERVAL_MS || '10000', 10);
@@ -55,21 +56,24 @@ function loadFixture(filename) {
   }
 }
 
-// Hàm proxy chuyển tiếp request sang Backend TDat
+// Hàm proxy chuyển tiếp request sang Backend TDat (Hỗ trợ cả HTTP và HTTPS)
 function proxyToBackend(req, res, targetUrl) {
   const target = new URL(targetUrl);
+  const isHttps = target.protocol === 'https:';
+  const client = isHttps ? https : http;
+
+  const headers = { ...req.headers };
+  headers.host = target.host;
+
   const options = {
     hostname: target.hostname,
-    port: target.port || (target.protocol === 'https:' ? 443 : 80),
+    port: target.port || (isHttps ? 443 : 80),
     path: req.url,
     method: req.method,
-    headers: {
-      ...req.headers,
-      host: `${target.hostname}:${target.port}`
-    }
+    headers: headers
   };
 
-  const proxyReq = http.request(options, (proxyRes) => {
+  const proxyReq = client.request(options, (proxyRes) => {
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
@@ -93,8 +97,8 @@ const server = http.createServer((req, res) => {
 
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, x-use-fixture');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);

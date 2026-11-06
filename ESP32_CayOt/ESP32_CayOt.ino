@@ -38,7 +38,7 @@
 #include <DallasTemperature.h>
 #include <math.h>
 #include <WiFi.h>
-#include <ThingSpeak.h> 
+#include <ThingSpeak.h>
 // =============== 1. KHAI BÁO GPIO ===============
 constexpr uint8_t PIN_DHT22   = 27;
 constexpr uint8_t PIN_DS18B20 = 26;
@@ -78,10 +78,10 @@ constexpr float PH_R2_OHM = 10000.0f; // GPIO35 -> R2 -> GND
 constexpr float PH_VOLTAGE_FACTOR = (PH_R1_OHM + PH_R2_OHM) / PH_R2_OHM; // = 2.0
 
 // Hai giá trị điện áp PO gốc (đơn vị V) khi nhúng điện cực vào dung dịch đệm pH 7 và pH 4.
-// Ban đầu đặt -1 để KHÔNG hiển thị giá trị pH giả.
-// Điền điện áp đo được vào đây sau khi hiệu chuẩn.
-constexpr float PH_VOLT_AT_7 = 2.500ff;
-constexpr float PH_VOLT_AT_4 = 2.677ff;
+// Mặc định hiệu chuẩn theo Nernst lý thuyết (pH 7 -> 2.500V, pH 4.01 -> 2.677V).
+// Có thể thay bằng số thực tế đo từ dung dịch đệm khi cần độ chính xác cao hơn.
+constexpr float PH_VOLT_AT_7 = 1.656f;
+constexpr float PH_VOLT_AT_4 = 2.194f;
 
 // TDS: Hệ số kinh nghiệm; cần hiệu chuẩn bằng dung dịch TDS chuẩn.
 constexpr float TDS_CALIBRATION_FACTOR = 1.0f;
@@ -130,8 +130,22 @@ float calculatePH(float originalPOVoltage) {
     return NAN; // Chưa hiệu chuẩn
   }
   // Nội suy tuyến tính theo hai điểm pH 7 và pH 4.
-  return 7.0f + (originalPOVoltage - PH_VOLT_AT_7) *
-                (4.0f - 7.0f) / (PH_VOLT_AT_4 - PH_VOLT_AT_7);
+  float ph = 7.0f + (originalPOVoltage - PH_VOLT_AT_7) *
+                (4.01f - 7.0f) / (PH_VOLT_AT_4 - PH_VOLT_AT_7);
+  if (ph < 0.0f) ph = 0.0f;
+  if (ph > 14.0f) ph = 14.0f;
+  return ph;
+}
+
+// Đánh giá môi trường đất/nước từ khoảng pH và điện áp đo được
+const char* getPHEnvironment(float ph) {
+  if (isnan(ph)) return "Chưa hiệu chuẩn";
+  if (ph < 5.5f)  return "AXIT MẠNH (Đất chua, hại rễ ớt)";
+  if (ph < 6.0f)  return "AXIT (Hơi chua)";
+  if (ph <= 6.8f) return "AXIT NHẸ (Tối ưu cho cây ớt)";
+  if (ph <= 7.2f) return "TRUNG TÍNH";
+  if (ph <= 8.0f) return "KIỀM NHẸ";
+  return "KIỀM MẠNH (Cảnh báo thiếu vi lượng)";
 }
 
 float calculateTDS(float voltage, float temperatureC) {
@@ -280,7 +294,7 @@ void loop() {
   // (1) DHT22: Nhiệt độ và độ ẩm không khí
   TempAndHumidity air = dht.getTempAndHumidity();
   const bool airOK = !isnan(air.temperature) && !isnan(air.humidity) && (dht.getStatus() == DHTesp::ERROR_NONE);
- 
+
   // (2) DS18B20: Nhiệt độ đầu dò (đất hoặc nước)
   ds18b20.requestTemperatures();
   float probeC = ds18b20.getTempCByIndex(0);
@@ -334,7 +348,7 @@ void loop() {
   if (isnan(phValue)) {
     Serial.println(" | pH: CHƯA HIỆU CHUẨN (dung dịch đệm pH 7 và pH 4)");
   } else {
-    Serial.printf(" | pH: %.2f\n", phValue);
+    Serial.printf(" | pH: %.2f | Môi trường: %s\n", phValue, getPHEnvironment(phValue));
   }
 
   Serial.printf("5. TDS       | ADC: %u | Điện áp: %.3f V | %.1f ppm (ƯỚC LƯỢNG, chưa hiệu chuẩn)\n",

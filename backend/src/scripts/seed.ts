@@ -141,10 +141,11 @@ export async function seedDatabase(): Promise<void> {
     ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description)
   `);
 
-  // 2. Readings
-  await insertReading(sample1, new Date('2026-11-04T08:00:02Z'));
-  await insertReading(sample2, new Date('2026-11-04T08:01:02Z'));
-  await insertReading(sample3, new Date('2026-11-04T08:02:02Z'));
+  // 2. Readings (Past fixtures so live incoming ESP32 data will be the newest)
+  const basePast = Date.now() - 6 * 60 * 60 * 1000; // 6 hours ago
+  await insertReading(sample1, new Date(basePast));
+  await insertReading(sample2, new Date(basePast + 60 * 1000));
+  await insertReading(sample3, new Date(basePast + 120 * 1000));
   await insertReading(sampleLive, now);
   await insertReading(sampleStale, staleTime);
 

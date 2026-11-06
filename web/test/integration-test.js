@@ -6,7 +6,7 @@
 
 const assert = require('assert');
 
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
+const BASE_URL = process.env.API_BASE_URL || 'https://pepper-nursery-iot.onrender.com';
 
 async function testBackendIntegration() {
   console.log(`====================================================`);
@@ -15,7 +15,7 @@ async function testBackendIntegration() {
   console.log(`====================================================\n`);
 
   let passed = 0;
-  let total = 6;
+  let total = 14;
 
   // 1. Health check
   try {
@@ -97,6 +97,163 @@ async function testBackendIntegration() {
     const data = await res.json();
     assert(Array.isArray(data.readings), 'readings phải là mảng');
     console.log(`✅ PASS (Nhận ${data.readings.length} bản ghi lịch sử)`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  let adminToken = null;
+  let userToken = null;
+
+  // 7. Đăng nhập Admin
+  try {
+    process.stdout.write('7. Kiểm tra API Đăng nhập Admin (POST /api/v1/auth/login)... ');
+    const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.status, 'ok');
+    assert(data.token, 'Phải trả về JWT token');
+    assert.strictEqual(data.user.role, 'admin');
+    adminToken = data.token;
+    console.log(`✅ PASS (Token nhận diện role: ${data.user.role})`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  // 8. Đăng nhập User
+  try {
+    process.stdout.write('8. Kiểm tra API Đăng nhập User kỹ thuật (POST /api/v1/auth/login)... ');
+    const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'user', password: 'user123' })
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.status, 'ok');
+    assert.strictEqual(data.user.role, 'user');
+    userToken = data.token;
+    console.log(`✅ PASS (Token nhận diện role: ${data.user.role})`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  // 9. Xác thực phiên GET /api/v1/auth/me
+  try {
+    process.stdout.write('9. Kiểm tra phiên người dùng (GET /api/v1/auth/me)... ');
+    assert(adminToken, 'Cần adminToken để kiểm tra');
+    const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.user.username, 'admin');
+    console.log(`✅ PASS (Xác thực người dùng: ${data.user.full_name})`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  // 10. Danh sách quy tắc chăm sóc GET /api/v1/rules
+  try {
+    process.stdout.write('10. Đọc danh sách quy tắc chăm sóc (GET /api/v1/rules?all=true)... ');
+    const res = await fetch(`${BASE_URL}/api/v1/rules?all=true`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert(Array.isArray(data.rules), 'rules phải là mảng');
+    console.log(`✅ PASS (Tìm thấy ${data.rules.length} quy tắc sinh học)`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  let testRuleId = null;
+  // 11. Admin thêm quy tắc mới
+  try {
+    process.stdout.write('11. Admin thêm quy tắc mới (POST /api/v1/rules)... ');
+    const testCode = `RULE_TEST_${Date.now().toString().slice(-4)}`;
+    const res = await fetch(`${BASE_URL}/api/v1/rules`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        rule_code: testCode,
+        name: 'Kiểm thử quy tắc tưới',
+        description: 'Tự động tạo từ integration test',
+        parameter: 'soil_moisture_pct',
+        operator: '<',
+        threshold_min: null,
+        threshold_max: 42.0,
+        severity: 'warning',
+        action_advice: 'Kích hoạt tưới bổ sung khẩn cấp cho vườn ươm ớt.',
+        is_active: true
+      })
+    });
+    assert.strictEqual(res.status, 201);
+    const data = await res.json();
+    assert(data.rule && data.rule.id);
+    testRuleId = data.rule.id;
+    console.log(`✅ PASS (Tạo thành công quy tắc ID #${testRuleId} mã ${testCode})`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  // 12. Admin sửa quy tắc
+  try {
+    process.stdout.write('12. Admin chỉnh sửa quy tắc (PUT /api/v1/rules/:id)... ');
+    assert(testRuleId, 'Cần testRuleId');
+    const res = await fetch(`${BASE_URL}/api/v1/rules/${testRuleId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        threshold_max: 45.0,
+        action_advice: 'Đã cập nhật ngưỡng tưới lên 45% theo chuyên gia nông học.'
+      })
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.rule.threshold_max, 45.0);
+    console.log('✅ PASS (Cập nhật ngưỡng thành công)');
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  // 13. Admin xóa quy tắc
+  try {
+    process.stdout.write('13. Admin xóa quy tắc thử nghiệm (DELETE /api/v1/rules/:id)... ');
+    assert(testRuleId, 'Cần testRuleId');
+    const res = await fetch(`${BASE_URL}/api/v1/rules/${testRuleId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert.strictEqual(res.status, 200);
+    console.log(`✅ PASS (Đã xóa an toàn quy tắc #${testRuleId})`);
+    passed++;
+  } catch (err) {
+    console.log(`❌ FAIL: ${err.message}`);
+  }
+
+  // 14. Kiểm tra ThingSpeak Status API
+  try {
+    process.stdout.write('14. Đọc trạng thái ThingSpeak Worker (GET /api/v1/sync/thingspeak/status)... ');
+    const res = await fetch(`${BASE_URL}/api/v1/sync/thingspeak/status`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert(data.data && typeof data.data.enabled === 'boolean');
+    console.log(`✅ PASS (Kênh ThingSpeak: ${data.data.channel_id}, Polling: ${data.data.is_polling})`);
     passed++;
   } catch (err) {
     console.log(`❌ FAIL: ${err.message}`);
