@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, User, KeyRound } from 'lucide-react';
+import { X, KeyRound } from 'lucide-react';
 import { authService } from '../services/auth.js';
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
@@ -12,12 +12,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
   const [errorMsg, setErrorMsg] = useState('');
 
   if (!isOpen) return null;
-
-  const handleQuickFill = (u, p) => {
-    setUsername(u);
-    setPassword(p);
-    setErrorMsg('');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,41 +74,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
             Đăng ký mới
           </button>
         </div>
-
-        {/* Quick Fill Preset Buttons */}
-        {tab === 'login' && (
-          <div style={{
-            background: 'var(--teal-soft)',
-            border: '1px solid var(--brand-teal)',
-            padding: '10px 12px',
-            borderRadius: 'var(--radius-md)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brand-navy)' }}>
-              ⚡ Điền nhanh tài khoản thử nghiệm từ CSDL:
-            </span>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button 
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => handleQuickFill('admin', 'admin123')}
-              >
-                <ShieldCheck size={13} color="var(--brand-coral)" />
-                <span>Admin (admin / admin123)</span>
-              </button>
-              <button 
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => handleQuickFill('user', 'user123')}
-              >
-                <User size={13} />
-                <span>Kỹ thuật (user / user123)</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Error Alert */}
         {errorMsg && (

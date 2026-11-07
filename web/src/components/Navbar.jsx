@@ -40,7 +40,7 @@ export default function Navbar({
           </div>
           <div className="brand-info">
             <h1>Vườn Ươm Ớt Con IoT</h1>
-            <p>Hệ thống giám sát vi khí hậu & chăm sóc ớt con · Phụ trách Web: <strong>DKhoa</strong></p>
+            <p>Hệ thống giám sát vi khí hậu & chăm sóc ớt con</p>
           </div>
         </div>
 
