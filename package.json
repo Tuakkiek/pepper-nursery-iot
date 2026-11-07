@@ -1,0 +1,12 @@
+{
+  "name": "pepper-nursery-iot-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root configuration for monorepo deployments on Render",
+  "scripts": {
+    "build": "npm --prefix web install && npm --prefix web run build",
+    "start": "npm --prefix web start",
+    "web:dev": "npm --prefix web run dev",
+    "backend:start": "npm --prefix backend start"
+  }
+}

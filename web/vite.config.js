@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: '/',
   server: {
     port: 3000,
     open: false,
@@ -13,6 +14,10 @@ export default defineConfig({
         secure: false,
       }
     }
+  },
+  preview: {
+    port: 3000,
+    host: '0.0.0.0'
   },
   build: {
     outDir: 'dist',
