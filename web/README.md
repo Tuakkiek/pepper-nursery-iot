@@ -91,6 +91,27 @@ npm run build
 ```
 Mã nguồn tối ưu sẽ được xuất ra thư mục `web/dist/` (tốc độ biên dịch cực nhanh ~400ms).
 
+### 3.4. Triển khai lên Cloud Render (Deploy to Render)
+
+#### Cách 1: Render Static Site (Khuyên dùng - Nhanh & Miễn phí)
+1. Trên Render Dashboard, chọn **New +** $\rightarrow$ **Static Site**.
+2. Kết nối repo và điền các trường cấu hình:
+   - **Root Directory:** `web`
+   - **Build Command:** `npm run build`
+   - **Publish Directory:** `dist` *(LƯU Ý: Phải là `dist`, KHÔNG được để `web` hay để trống!)*
+3. Vào mục **Redirects/Rewrites** thêm 1 dòng:
+   - **Source:** `/*`
+   - **Destination:** `/index.html`
+   - **Action:** `Rewrite`
+4. Bấm **Create Static Site**.
+
+#### Cách 2: Render Web Service (Node.js Service)
+1. Trên Render Dashboard, chọn **New +** $\rightarrow$ **Web Service**.
+2. Điền cấu hình:
+   - **Root Directory:** `web`
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start` *(chạy `node prod-server.js` phục vụ thư mục `dist/` kèm MIME types chuẩn và tự động nhận diện `$PORT`)*.
+
 ---
 
 ## 4. Kiểm thử tự động (Test Suites)

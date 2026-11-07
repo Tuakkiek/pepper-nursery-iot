@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite",
+    "start": "node prod-server.js",
     "test": "node test/fixture-test.js",
     "test:integration": "node test/integration-test.js"
   },
