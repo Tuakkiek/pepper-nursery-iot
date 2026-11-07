@@ -1,13 +1,17 @@
 /**
  * Automated Test Suite for G0 Fixtures & Adapter
- * Chạy bằng: node test/fixture-test.js
+ * Chạy bằng: npm test hoặc node test/fixture-test.js
  */
 
-const fs = require('fs');
-const path = require('path');
-const assert = require('assert');
+import fs from 'fs';
+import path from 'path';
+import assert from 'assert';
+import { fileURLToPath } from 'url';
 
-console.log('🧪 Đang chạy kiểm thử bộ Fixtures và Hợp đồng G0 v0.1 cho Web Dashboard...\n');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+console.log('🧪 Đang chạy kiểm thử bộ Fixtures và Hợp đồng G0 v0.1 cho Web Dashboard (React + Vite)...\n');
 
 const FIXTURES_DIR = path.resolve(__dirname, '../../docs/contracts/fixtures');
 
@@ -77,4 +81,3 @@ assert(zeroValue !== null && zeroValue !== undefined, 'Số 0 hợp lệ không 
 console.log('  ✓ Quy tắc 0 != null được kiểm chứng.');
 
 console.log('\n🎉 TẤT CẢ CÁC BÀI KIỂM THỬ FIXTURE ĐÃ VƯỢT QUA (7/7 tests passed)!');
-

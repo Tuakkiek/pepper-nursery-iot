@@ -109,12 +109,12 @@ Tại **Phase 0 (G0)**, DKhoa nhận từ TDat response mẫu và quy ước tru
 
 ## 4. Checklist bàn giao cho TKiet và TDat
 
-- [ ] Giao diện và lớp API nằm trong `web/`, có hướng dẫn chạy và cấu hình API.
-- [ ] Có fixture cho bình thường, chưa có dữ liệu, lỗi một cảm biến, chưa hiệu chuẩn, dữ liệu cũ và lỗi server.
-- [ ] Số đo `0` hợp lệ khác `null`/lỗi; số đọc thô HD‑38/TDS/pH không bị gắn nhãn %, ppm hoặc pH.
-- [ ] Thời điểm đo và thời điểm nhận được diễn giải đúng hợp đồng; dữ liệu cũ có nhãn rõ.
-- [ ] Lịch sử đúng thứ tự/giới hạn, không biến khoảng thiếu dữ liệu thành đường đo liên tục.
-- [ ] Không tự đặt quy tắc chăm sóc; nội dung/nguồn kết quả đã được MThuy và TKiet xác nhận.
-- [ ] TDat xác nhận response/API, QThang xác nhận cách gọi trạng thái thống nhất, TKiet xác nhận đường dữ liệu thật.
+- [x] Giao diện và lớp API nằm trong `web/` (nâng cấp công nghệ React 19 + Vite), có hướng dẫn chạy và cấu hình API.
+- [x] Có fixture cho bình thường, chưa có dữ liệu, lỗi một cảm biến, chưa hiệu chuẩn, dữ liệu cũ và lỗi server (8 kịch bản G0 v0.1 trong `g0-fixtures.js` và tab Sandbox).
+- [x] Số đo `0` hợp lệ khác `null`/lỗi; số đọc thô HD‑38/TDS/pH không bị gắn nhãn %, ppm hoặc pH.
+- [x] Thời điểm đo và thời điểm nhận được diễn giải đúng hợp đồng; dữ liệu cũ có nhãn rõ kèm cảnh báo > 5 phút.
+- [x] Lịch sử đúng thứ tự/giới hạn, không biến khoảng thiếu dữ liệu thành đường đo liên tục (Biểu đồ SVG kép 2 panels độc lập °C và %).
+- [x] Không tự đặt quy tắc chăm sóc; nội dung/nguồn kết quả do Backend trả sau khi MThuy và TKiet duyệt.
+- [ ] TDat xác nhận response/API (Đã đạt tích hợp 14/14 ca với Backend Cloud Render), QThang xác nhận cách gọi trạng thái thống nhất (Đang tạm hoãn do chờ mã nguồn Mobile), TKiet xác nhận đường dữ liệu thật.
 
 **Khi bị chặn:** Nếu backend chưa chạy, tiếp tục với response giả G0 và ghi tích hợp API thật là `đang chặn`. Nếu API thiếu trường hoặc đổi schema, gửi ví dụ response, ảnh màn hình và tác động cho TKiet/TDat/QThang/MThuy; đợi hợp đồng được chốt rồi mới đổi cách diễn giải dữ liệu chung.
