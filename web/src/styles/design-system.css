@@ -1,0 +1,91 @@
+/**
+ * Design System 1.0 — Tokens CSS cho Web Dashboard & Mobile
+ * Tuân thủ nghiêm ngặt Design_System_Web_Mobile.md:
+ * - Palette 4 màu gốc: #F7444E (Coral), #F7F8F3 (Cream), #78BCC4 (Teal), #002C3E (Navy)
+ * - Màu bổ trợ cho tương phản cao: Surface (#FFF), text-secondary (#4B6570), border (#D5E1E0)
+ * - Tỷ lệ tương phản: Navy/Cream 13.76:1, Navy/Teal 6.85:1, Coral.strong/Cream 5.99:1
+ */
+
+:root {
+  /* 1. Palette 4 màu gốc */
+  --brand-coral: #F7444E;
+  --brand-cream: #F7F8F3;
+  --brand-teal: #78BCC4;
+  --brand-navy: #002C3E;
+
+  /* 2. Màu bổ trợ & Ngữ cảnh */
+  --surface: #FFFFFF;
+  --surface-alt: #F1F4EE;
+  --text-primary: #002C3E;       /* brand.navy */
+  --text-secondary: #4B6570;     /* text.secondary */
+  --text-muted: #7E97A0;
+  --border: #D5E1E0;
+  --border-subtle: #E5EEED;
+
+  /* 3. Màu trạng thái & Badge */
+  --teal-soft: #E7F3F3;
+  --teal-border: #78BCC4;
+  --coral-soft: #FFE9EA;
+  --coral-strong: #B62430;
+
+  --amber-soft: #FFF4E5;
+  --amber-strong: #B76E00;
+  --amber-border: #FFD599;
+
+  --success-soft: #E6F8EE;
+  --success-strong: #0D7A42;
+  --success-border: #9DE5BE;
+
+  /* 4. Khoảng cách (Spacing) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* 5. Bo góc (Border radius) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+
+  /* 6. Bóng đổ (Shadows) */
+  --shadow-sm: 0 1px 2px rgba(0, 44, 62, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 44, 62, 0.06);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 44, 62, 0.08);
+  --shadow-modal: 0 20px 40px -10px rgba(0, 44, 62, 0.2);
+
+  /* 7. Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--brand-cream);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Định dạng số tabular để các chữ số không bị giật khi cập nhật */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+code, pre {
+  font-family: var(--font-mono);
+}
+
