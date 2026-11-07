@@ -222,7 +222,7 @@ export default function App() {
         color: 'var(--text-secondary)'
       }}>
         <div>
-          <strong>Pepper Nursery IoT MVP</strong> · Web Dashboard (React + Vite) · Phụ trách: <strong>DKhoa</strong>
+          <strong>Pepper Nursery IoT MVP</strong>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           <span className="badge badge-normal">🎨 Design System 1.0</span>

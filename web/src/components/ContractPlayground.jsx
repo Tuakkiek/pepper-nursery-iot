@@ -64,7 +64,7 @@ export default function ContractPlayground({ onSelectScenario, currentScenario }
           </h2>
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.5 }}>
-          Phòng thử nghiệm cho phép DKhoa, TKiet (Trưởng nhóm) và giảng viên đối soát trực quan 8 kịch bản biên trong hợp đồng dữ liệu giữa Phần cứng ESP32, Backend và Web Dashboard mà không cần phụ thuộc vào môi trường thật.
+          Phòng thử nghiệm cho phép nhóm phát triển và người dùng đối soát trực quan 8 kịch bản biên trong hợp đồng dữ liệu giữa Phần cứng ESP32, Backend và Web Dashboard mà không cần phụ thuộc vào môi trường thật.
         </p>
       </div>
 
