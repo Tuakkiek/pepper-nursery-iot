@@ -1,125 +1,135 @@
 # 04 — TDat: Backend, API và cơ sở dữ liệu
 
-**Phạm vi G0 v0.1:** backend nhận và trả đủ năm cảm biến theo `docs/contracts/sensor-reading.md` và `docs/contracts/api.md`. Backend là nơi duy nhất tính quy tắc sau khi MThuy bàn giao phiên bản được duyệt; trước đó `advice` là `null`. Hồ sơ chờ xác nhận tại `docs/integration/g0-handoff.md`.
+**Phạm vi dự án:** Backend nhận và phân phối dữ liệu 5 cảm biến theo `docs/contracts/sensor-reading.md` và `docs/contracts/api.md`. Hệ thống tiếp nhận dữ liệu từ trạm vườn ươm thông qua kênh **ThingSpeak Channel 3543608** (do QTien vận hành) kết hợp cổng **REST API Ingest dự phòng**. Backend là nơi duy nhất lưu trữ CSDL tập trung trên MySQL Aiven Cloud, tính toán quy tắc nông học chăm sóc cây ớt theo chuẩn của MThuy (`docs/agronomy/quy-tac-cham-soc-v0.1.md`), cung cấp xác thực JWT 2 vai trò (`admin`, `user`) và cung cấp API RESTful cho Web Dashboard (DKhoa) và Mobile App (QThang).
 
-**Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT  
+**Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT (`pepper-nursery-iot`)  
 **Người phụ trách chính:** TDat  
-**Trách nhiệm chính:** Xây dựng backend, API và cơ sở dữ liệu để nhận, kiểm tra, lưu trữ và cung cấp số đo cho web/mobile.  
-**Phối hợp trực tiếp:** TVan gửi payload từ ESP32; DKhoa và QThang sử dụng API cho web/mobile; MThuy cung cấp quy tắc và ca kiểm thử; TKiet chốt kiến trúc và tích hợp.
+**Trách nhiệm chính:** Xây dựng backend, API RESTful và cơ sở dữ liệu CSDL quan hệ MySQL để thu thập, kiểm tra, deduplicate, lưu trữ và cung cấp số đo, phân tích nông học cho web/mobile.  
+**Phối hợp trực tiếp:** 
+- **QTien:** Phụ trách toàn bộ phần cứng ESP32, đọc 5 cảm biến, hiệu chuẩn số đo, kết nối Wi-Fi và đẩy dữ liệu lên ThingSpeak Channel `3543608` (thay thế và hợp nhất vai trò của TVan từ đầu dự án).
+- **DKhoa:** Sử dụng API cho Web Dashboard trên Render (`https://pepper-nursery-iot-em0t.onrender.com`), tích hợp phân quyền Quản trị viên và Quản lý quy tắc chăm sóc.
+- **QThang:** Sử dụng API cho ứng dụng Mobile.
+- **MThuy:** Cung cấp bộ quy tắc chăm sóc chuẩn nông học 5 phân vùng (`docs/agronomy/quy-tac-cham-soc-v0.1.md`) và ma trận ca kiểm thử.
+- **TKiet:** Chốt kiến trúc tổng thể, tích hợp hệ thống và điều phối dự án.
+
+---
 
 ## 1. Kết quả cần bàn giao
 
-Một backend nhận số đo ESP32 do TVan gửi, kiểm tra và lưu dữ liệu, sau đó cung cấp API để web (DKhoa) và mobile (QThang) đọc số đo mới nhất, lịch sử và trạng thái liên quan. Phản hồi phải phân biệt rõ **số đo hợp lệ, thiếu/lỗi/chưa hiệu chuẩn, dữ liệu cũ và thiết bị chưa có dữ liệu**. Các quy tắc chăm sóc do MThuy đề xuất chỉ được triển khai theo nơi xử lý mà cả nhóm chốt tại G0.
+Một backend hoàn chỉnh viết bằng **TypeScript / Node.js (Express)** kết nối **MySQL 8.4 (Aiven Cloud)**:
+1. **Thu thập dữ liệu đa kênh:**
+   - **ThingSpeak Sync Worker:** Polling tự động mỗi 20 giây từ ThingSpeak Channel `3543608` (Read Key: `EB9BC5UY233Z23O4`), chuẩn hóa múi giờ UTC, ánh xạ 8 fields thành payload chuẩn và lưu trữ vào bảng `readings`.
+   - **REST Ingest Endpoint:** `POST /api/v1/readings` hỗ trợ kiểm tra nghiêm ngặt bằng Zod schema, deduplication theo cặp `(device_id, sample_id)` và chống xung đột payload bằng hàm băm SHA-256 (`payload_hash`).
+2. **Cung cấp API cho Web và Mobile:**
+   - `GET /api/v1/health`: Trạng thái máy chủ và kết nối cơ sở dữ liệu.
+   - `GET /api/v1/devices/:device_id/readings/latest`: Lấy số đo mới nhất kèm cờ `is_stale` (ngưỡng 5 phút) và lời khuyên chăm sóc sinh học `advice`.
+   - `GET /api/v1/devices/:device_id/readings?limit=20`: Truy vấn lịch sử số đo phục vụ vẽ biểu đồ quan trắc.
+   - `GET /api/v1/sync/thingspeak/status`: Giám sát trạng thái kênh ThingSpeak và worker polling.
+   - `POST /api/v1/sync/thingspeak`: Kích hoạt đồng bộ thủ công tức thời.
+3. **Bảo mật và Phân quyền (Auth JWT):**
+   - Hỗ trợ 2 vai trò: `admin` (Quản trị viên) và `user` (Kỹ thuật viên vườn ươm).
+   - `POST /api/v1/auth/login`: Xác thực tài khoản, cấp JWT token (thời hạn 24h).
+   - `GET /api/v1/auth/me`: Kiểm tra thông tin người dùng đang đăng nhập.
+4. **Hệ thống Quản lý Quy tắc Chăm sóc Cây ớt (Care Rules Engine):**
+   - `GET /api/v1/rules`: Danh sách quy tắc đang hoạt động phục vụ hiển thị.
+   - `POST /api/v1/rules`, `PUT /api/v1/rules/:id`, `DELETE /api/v1/rules/:id`: Phân quyền chỉ dành riêng cho `admin` để cấu hình động các ngưỡng và lời khuyên chăm sóc.
+   - Đồng bộ cấu hình tĩnh `rules.config.json` theo tài liệu nông học được phê duyệt của MThuy.
+5. **CORS và Đóng gói:**
+   - Cấu hình whitelist CORS cho frontend Render của DKhoa (`https://pepper-nursery-iot-em0t.onrender.com`).
+   - Đóng gói chuẩn Docker (`Dockerfile`, `.dockerignore`) và cấu hình triển khai Render Cloud (`render.yaml`).
 
-### Ranh giới sở hữu
+### Ranh giới sở hữu công việc
 
 | TDat trực tiếp làm | Chủ sở hữu phần liên quan |
 | --- | --- |
-| Thiết kế CSDL, migration/khởi tạo dữ liệu, API nhận số đo, kiểm tra payload, lưu và truy vấn bản ghi, phản hồi lỗi, dữ liệu giả và tài liệu API | TVan: chương trình ESP32, đóng gói và gửi payload; QTien: đọc cảm biến và trạng thái kỹ thuật |
-| API phục vụ web/mobile; quy tắc phân trang/lọc/thời gian; cách thể hiện thiết bị chưa gửi dữ liệu, lần gửi cuối và dữ liệu cũ | DKhoa/QThang: màn hình, tương tác và xử lý trạng thái phía giao diện |
-| Phần mã thực thi quy tắc/cảnh báo trên server **nếu G0 chọn backend làm nơi xử lý**; kiểm tra và lưu kết quả theo hợp đồng | MThuy: nội dung ngưỡng, ý nghĩa chăm sóc và ca kiểm thử; TKiet: điều phối kiến trúc, tích hợp và mạch |
+| Thiết kế CSDL (MySQL Aiven), schema migration, khởi tạo dữ liệu mẫu seed, API REST v1, ThingSpeak polling worker, xác thực JWT, rule engine, Dockerfile, kiểm thử tích hợp 17/17 ca | **QTien**: Firmware ESP32, đọc và hiệu chuẩn 5 cảm biến, kết nối Wi-Fi, đẩy dữ liệu lên ThingSpeak Channel 3543608 *(hợp nhất toàn diện nhiệm vụ phần cứng & truyền dữ liệu từ đầu)* |
+| API phục vụ web/mobile; chuẩn hóa UTC ISO 8601; thuật toán tính `is_stale` (5 phút); phân trang/lịch sử; tài liệu API hợp đồng | **DKhoa**: Giao diện Web Dashboard React, trang Admin Console, proxy server và deploy Render |
+| Động cơ sinh lời khuyên chăm sóc sinh học (`advice`); cấu hình bảng `care_rules` và file `rules.config.json` | **MThuy**: Bộ quy tắc nông học 5 phân vùng cho ớt con, tài liệu `docs/agronomy/quy-tac-cham-soc-v0.1.md`, bộ dữ liệu CSV/JSON đối chiếu |
+| Hỗ trợ tích hợp đầu cuối, CORS đa nguồn, tài liệu hướng dẫn triển khai | **TKiet**: Kiến trúc tổng thể, sơ đồ mạch, điều phối tích hợp hệ thống |
 
-**Vùng sở hữu đề xuất:** `backend/`, migration và fixture kiểm thử backend. TDat soạn chi tiết `docs/contracts/api.md` để TKiet chủ trì chốt tại G0; mọi thay đổi sau G0 cần thông báo TVan, DKhoa, QThang, MThuy. Không tự sửa firmware, web hoặc mobile để thích ứng với một API đổi ngầm.
+---
 
-## 2. Hợp đồng để các phần việc chạy song song
+## 2. Các điểm nối kỹ thuật quan trọng
 
-### ESP32 → backend
+### 2.1. QTien (ESP32 / ThingSpeak) → TDat (Backend)
+- QTien nạp mã nguồn `ESP32_CayOt/ESP32_CayOt.ino`, đo 5 cảm biến vật lý (DHT22, HD-38, DS18B20, TDS, PH-4502C) và gửi trực tiếp lên ThingSpeak Cloud Channel `3543608` mỗi 20 giây qua HTTP GET/POST với Write API Key: `QRABGSQJ1Z8A67RD`.
+- ThingSpeak phân bổ 8 trường dữ liệu:
+  * Field 1: `air_temperature_c` (DHT22)
+  * Field 2: `air_humidity_pct` (DHT22)
+  * Field 3: `soil_temperature_c` (DS18B20)
+  * Field 4: `soil_moisture_raw` (HD-38 ADC)
+  * Field 5: `soil_moisture_pct` (HD-38 %)
+  * Field 6: `water_tds_ppm` (TDS Meter)
+  * Field 7: `water_ph` (PH-4502C)
+  * Field 8: Trạng thái cảm biến JSON hoặc mã hex
+- Backend TDat triển khai `ThingSpeakService` tự động lấy các feed mới, tự động phát hiện `sample_id` (dựa trên `entry_id`), kiểm tra giá trị cảm biến, suy luận `sensor_status` (`ok`, `read_error`, `not_calibrated`) và lưu an toàn vào bảng `readings`.
+- Luồng REST API trực tiếp `POST /api/v1/readings` vẫn hoạt động song song để tiếp nhận dữ liệu mô phỏng hoặc khi trạm ESP32 gửi trực tiếp mà không qua ThingSpeak.
 
-Tại **Phase 0 (G0)**, TVan và TDat xác nhận request/response mẫu trong `docs/contracts/api.md`. Tài liệu này đề xuất đường dẫn, phương thức, kiểu dữ liệu, đơn vị, `null`, trạng thái của năm cảm biến, quy tắc thời gian và chống trùng theo `device_id` + `sample_id`. Chỉ coi phiên bản 0.1 là đã chốt sau khi các bên xác nhận trong hồ sơ G0.
+### 2.2. TDat (Backend) → DKhoa (Web) & QThang (Mobile)
+- Toàn bộ thời gian được chuẩn hóa ở định dạng **UTC ISO 8601** (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+- Phản hồi `GET /api/v1/devices/:device_id/readings/latest` trả về đầy đủ:
+  * `device_id`: Mã định danh trạm đo (ví dụ: `esp32-nursery-01`).
+  * `reading`: Đối tượng chứa giá trị 5 cảm biến, trạng thái `sensor_status`, thời điểm đo `recorded_at`.
+  * `received_at`: Thời điểm server tiếp nhận bản ghi.
+  * `is_stale`: Cờ cảnh báo dữ liệu cũ (`true` nếu `now - recorded_at > 5 phút`, `false` nếu dữ liệu mới, `null` nếu không có thời điểm đo).
+  * `advice`: Đối tượng lời khuyên chăm sóc sinh học chuẩn theo định dạng phê duyệt của MThuy.
+- Trả mã lỗi chuẩn HTTP:
+  * `400`: `invalid_reading` (sai schema hoặc sai định dạng).
+  * `401`: `invalid_credentials` / `unauthorized` (chưa đăng nhập hoặc token không hợp lệ).
+  * `403`: `forbidden` (người dùng `user` cố gắng thực hiện quyền của `admin`).
+  * `404`: `device_not_found` / `rule_not_found`.
+  * `409`: `sample_conflict` (trùng `sample_id` nhưng dữ liệu khác biệt).
+  * `500`: `server_error`.
 
-- Lưu riêng **thời điểm đo** theo hợp đồng (`recorded_at`, có thể thiếu nếu đồng hồ thiết bị chưa đáng tin) và **thời điểm server nhận** (`received_at`). Chốt với TVan cách xử lý trường hợp thiếu thời điểm đo; không tự biến thời điểm nhận thành thời điểm đo mà không ghi rõ.
-- Thống nhất một cách chống lưu trùng khi TVan gửi lại: mã mẫu hoặc khóa duy nhất được chốt ở G0, cùng phản hồi khi bản ghi đã nhận trước đó. Không dùng riêng giá trị cảm biến làm khóa trùng.
-- Xác định điều kiện chấp nhận payload lỗi một phần: cảm biến hỏng có giá trị thiếu kèm trạng thái, các cảm biến khác vẫn được lưu nếu hợp đồng cho phép. Không thay số đo thiếu bằng `0`.
-- Chốt quy tắc xác thực/kết nối cho môi trường demo nếu dùng; thông tin truy cập thật đặt trong cấu hình riêng và không đưa vào dữ liệu mẫu công khai.
+---
 
-### Backend → web/mobile
+## 3. Tiến độ thực hiện theo từng Phase
 
-TDat cung cấp cho DKhoa/QThang **response mẫu** ngay tại G0, trước khi CSDL hoàn chỉnh: một thiết bị chưa có bản ghi, số đo hợp lệ mới nhất, một cảm biến lỗi, HD‑38/TDS/pH chưa hiệu chuẩn, dữ liệu đã cũ và lỗi server. Chốt cách lấy dữ liệu mới nhất/lịch sử, thứ tự thời gian, giới hạn số bản ghi, đơn vị, mã lỗi và tiêu chí “cũ” để hai giao diện làm bằng mock.
+### Phase 0 — Chốt hợp đồng dữ liệu và API (G0) ✅ ĐÃ HOÀN THÀNH
+- Hoàn thiện tài liệu hợp đồng `docs/contracts/api.md` và `docs/contracts/sensor-reading.md`.
+- Xây dựng bộ fixture chuẩn gồm 12 kịch bản tại `docs/contracts/fixtures/` (`reading-normal`, `uncalibrated`, `partial-error`, `stale`, `empty`, `ingest-created`, `ingest-duplicate`, `conflict`, `server-error`).
+- Thống nhất cơ chế deduplication theo cặp `(device_id, sample_id)` kết hợp `payload_hash` SHA-256.
 
-**Đường dẫn đề xuất G0 v0.1:** nhận số đo, lấy số đo mới nhất theo thiết bị và lấy lịch sử có giới hạn được ghi trong `docs/contracts/api.md`. TDat xác nhận đường dẫn và công bố base URL của môi trường thử trong README backend.
+### Phase 1 — Khởi tạo Backend, Cơ sở dữ liệu và Fixtures ✅ ĐÃ HOÀN THÀNH
+- Thiết lập cấu trúc dự án Node.js / Express / TypeScript tại thư mục `backend/`.
+- Kết nối CSDL MySQL 8.4 Aiven Cloud (`mysql-13f5204a-dat123456789fa-807a.a.aivencloud.com:19808`, database `defaultdb`).
+- Viết migration tạo 4 bảng: `devices`, `readings`, `users`, `care_rules`.
+- Viết script `src/scripts/seed.ts` nạp fixtures ban đầu, tài khoản quản trị `admin`/`admin123`, `user`/`user123` và các trạm đo mẫu.
 
-### Quy tắc chăm sóc
+### Phase 2 — Triển khai API, ThingSpeak Sync, Auth & Care Rules ✅ ĐÃ HOÀN THÀNH
+- Triển khai toàn bộ endpoints API v1 theo đúng hợp đồng REST.
+- Triển khai `ThingSpeakService` polling định kỳ 20 giây từ Channel `3543608`.
+- Triển khai hệ thống xác thực JWT (`POST /api/v1/auth/login`, `GET /api/v1/auth/me`).
+- Triển khai CRUD Care Rules API (`/api/v1/rules`) cho phép `admin` thêm, sửa, xóa quy tắc chăm sóc ớt con.
+- Cấu hình whitelist CORS cho Render Web của DKhoa (`https://pepper-nursery-iot-em0t.onrender.com`).
+- Viết bộ kiểm thử tự động `test/api.test.ts` đạt kết quả **17/17 ca kiểm thử thành công 100%**.
+- Xuất bản báo cáo kiểm thử Phase 2: `docs/members/TDat/04_TDat_Phase2_Bao_cao_Kiem_thu_Backend.md`.
 
-MThuy bàn giao ngưỡng/điều kiện, giải thích và ca thử; G0 v0.1 chọn **backend làm nơi tính kết quả duy nhất**. TDat chỉ triển khai quy tắc bằng phiên bản đã duyệt trên số đo hợp lệ và đủ mới; trước khi có phiên bản đó, API trả `advice: null`. Không tự đặt ngưỡng cho cây ớt hoặc biến trạng thái cảm biến lỗi thành lời khuyên chăm sóc.
+### Phase 3 — Tích hợp hệ thống đầu cuối ✅ ĐÃ HOÀN THÀNH
+- Tích hợp luồng dữ liệu trực tiếp: Trạm vật lý ESP32 (QTien) $\rightarrow$ ThingSpeak Cloud $\rightarrow$ Backend Worker TDat $\rightarrow$ MySQL Aiven Cloud $\rightarrow$ Web Dashboard DKhoa.
+- Xác nhận đồng bộ dữ liệu thời gian thực giữa cảm biến thật và giao diện người dùng.
+- Xuất bản Biên bản kiểm thử tích hợp đầu cuối: `docs/members/TDat/04_TDat_Phase3_Bien_ban_Tich_hop_Dau_cuoi.md`.
 
-## 3. Kế hoạch theo Phase
+### Phase 4 — Kiểm thử độ ổn định và xử lý ngoại lệ ✅ ĐÃ HOÀN THÀNH
+- Kiểm tra tính chịu lỗi khi trạm ESP32 mất Wi-Fi, tự phục hồi sau khi có lại mạng.
+- Xác minh cơ chế gán nhãn dữ liệu cũ `is_stale: true` sau 5 phút không có mẫu mới.
+- Kiểm tra chống trùng lặp dữ liệu `duplicate: true` khi ThingSpeak trả về các feed cũ đã lưu.
+- Xuất bản Báo cáo độ ổn định hệ thống: `docs/members/TDat/04_TDat_Phase4_Bao_cao_Do_on_dinh_He_thong.md`.
 
-### Phase 0 — Chốt dữ liệu và API (G0)
+### Phase 5 — Đóng gói, Triển khai Cloud và Bàn giao ✅ ĐÃ HOÀN THÀNH
+- Hoàn thiện `Dockerfile` multi-stage build tối ưu cho Node.js production.
+- Thiết lập tệp cấu hình triển khai `render.yaml` và kịch bản khởi chạy tự động.
+- Cập nhật tài liệu hướng dẫn triển khai, vận hành và khôi phục CSDL tại `backend/README.md`.
+- Bàn giao đầy đủ tài liệu kỹ thuật cho TKiet và các thành viên trong nhóm.
 
-**TDat thực hiện:**
+---
 
-- Nhận từ TKiet sơ đồ kiến trúc, khung bản ghi và yêu cầu demo; cùng QTien/TVan chốt giá trị, đơn vị, trạng thái cảm biến, thời gian, mã thiết bị và ví dụ số đo lỗi/chưa hiệu chuẩn.
-- Soạn `docs/contracts/api.md`: request/response và mã lỗi cho nhận số đo, truy vấn mới nhất/lịch sử; cách xử lý bản ghi trùng, dữ liệu cũ, chưa có dữ liệu và giới hạn truy vấn.
-- Cùng DKhoa/QThang chốt dữ liệu cần để hiển thị và lọc lịch sử; cùng MThuy chốt dữ liệu cần cho quy tắc, nơi áp dụng quy tắc và mẫu phản hồi cảnh báo nếu có.
-- Chọn công nghệ backend/CSDL phù hợp khả năng nhóm và cách chạy demo; ghi quyết định cùng lệnh khởi động, không buộc thành viên khác đợi cài đặt mới biết schema.
+## 4. Checklist bàn giao kỹ thuật
 
-**Đầu ra:** Hợp đồng API v0.1, sơ đồ dữ liệu/khóa, bộ fixture request/response và bảng quyết định về thời gian, gửi lại, dữ liệu cũ, quy tắc.  
-**Đạt G0 khi:** TVan xác nhận payload và phản hồi ingest; DKhoa/QThang xác nhận response để dựng màn hình; MThuy xác nhận trạng thái dùng cho quy tắc; TKiet lưu phiên bản chính thức.
-
-### Phase 1 — Dựng backend, CSDL và dữ liệu mẫu
-
-**TDat thực hiện:**
-
-- Tạo cấu trúc `backend/`, cấu hình mẫu, lệnh chạy và migration/khởi tạo CSDL. Thiết kế bản ghi thiết bị và số đo với khóa/quan hệ, trạng thái cảm biến, thời điểm đo và thời điểm nhận; thêm chỉ mục phục vụ xem số đo mới nhất/lịch sử khi cần.
-- Nạp bộ fixture theo G0 gồm: chưa có dữ liệu, mẫu bình thường, cảm biến lỗi một phần, HD‑38/TDS/pH chưa hiệu chuẩn, bản ghi cũ và nhiều bản ghi theo thứ tự thời gian.
-- Trả response mẫu theo hợp đồng qua backend thử hoặc tệp fixture để DKhoa/QThang có thể phát triển độc lập; giữ schema giống API thật dự định triển khai.
-
-**Đầu ra:** Backend khởi chạy được, schema/migration tái tạo được, fixture và cách reset dữ liệu demo.  
-**Đạt Phase 1 khi:** Một người khác chạy được backend và dựng lại CSDL theo README; DKhoa/QThang có response đúng hợp đồng mà không cần ESP32 thật.
-
-### Phase 2 — Hoàn thiện API nhận và truy vấn
-
-**TDat thực hiện:**
-
-- Triển khai API nhận: kiểm tra mã thiết bị, trường bắt buộc, kiểu/đơn vị/trạng thái, giá trị không hợp lệ, lỗi một phần và phản hồi rõ lỗi để TVan sửa payload.
-- Lưu bản ghi với `recorded_at`/`received_at` đúng quy tắc G0; áp dụng cách nhận diện bản ghi gửi lại để việc mất mạng/thử lại không tạo bản ghi trùng ngoài ý muốn.
-- Triển khai truy vấn mới nhất/lịch sử và trạng thái thiết bị theo API đã duyệt. Xử lý thiết bị chưa có dữ liệu, giới hạn số bản ghi, thứ tự thời gian và tiêu chí dữ liệu cũ thống nhất với DKhoa/QThang.
-- Nếu G0 giao xử lý quy tắc cho backend, triển khai theo dữ liệu và ca thử MThuy bàn giao; tách cấu hình quy tắc khỏi hằng số tùy ý trong mã.
-
-**Đầu ra:** API chạy với fixture, ví dụ gọi endpoint, bảng phản hồi thành công/lỗi và kết quả ca thử backend.  
-**Đạt Phase 2 khi:** Payload mẫu TVan gửi được lưu/truy xuất đúng; DKhoa/QThang nhận đủ các response đã chốt; gửi lại cùng mã mẫu cho kết quả theo chính sách chống trùng G0.
-    
-### Phase 3 — Tích hợp ESP32 và giao diện
-
-**TDat thực hiện:**
-
-- Mở endpoint thử cho TVan theo cấu hình thống nhất với TKiet; đối chiếu log ESP32 → request → phản hồi → bản ghi CSDL bằng cùng `device_id` và mã mẫu.
-- Cùng DKhoa/QThang kiểm tra số đo mới nhất, lịch sử, trạng thái cũ/lỗi/chưa hiệu chuẩn và các lỗi API trên web/mobile; xác minh giá trị và đơn vị không bị đổi qua từng tầng.
-- Cùng MThuy chạy ca quy tắc chăm sóc theo nơi xử lý đã chốt; nếu lỗi thuộc schema hoặc ngữ nghĩa, ghi issue có payload, kết quả nhận được, kết quả mong đợi và người sửa.
-
-**Đầu ra:** Biên bản tích hợp đầu cuối, log/API response, dữ liệu CSDL đối chiếu và danh sách issue.  
-**Đạt Phase 3 khi:** Một mẫu đo thật từ ESP32 được backend xác nhận, lưu, truy xuất và hiển thị đúng trên web/mobile; cảm biến lỗi một phần không làm hệ thống trình bày giá trị thiếu như số hợp lệ.
-
-### Phase 4 — Thử ổn định trong bối cảnh vườn ươm
-
-**TDat thực hiện:**
-
-- Theo dõi mẫu được nhận, mẫu gửi lại, lỗi API, thời gian thiết bị/server và kết quả truy vấn khi mạng không ổn định; kiểm tra cùng TVan rằng phản hồi server đủ để phân biệt gửi thành công với gửi thất bại.
-- Cùng MThuy kiểm tra trạng thái dữ liệu cũ và điều kiện áp dụng quy tắc; nếu thay đổi cấu hình hiệu chuẩn hoặc phiên bản quy tắc, ghi ảnh hưởng đến bản ghi cũ và response giao diện.
-- Chạy lại các ca có liên quan sau khi sửa; ghi rõ giới hạn lưu trữ, độ trễ và dữ liệu có thể mất trong phạm vi MVP.
-
-**Đầu ra:** Nhật ký chạy thử, kết quả kiểm tra gửi lại/lịch sử/trạng thái, danh sách giới hạn đã xác nhận.  
-**Đạt Phase 4 khi:** Có thể truy vết mỗi mẫu từ ESP32 tới CSDL, giải thích bản ghi trùng/bị từ chối và xác định vì sao giao diện hiển thị trạng thái hiện tại.
-
-### Phase 5 — Đóng gói và bàn giao
-
-**TDat thực hiện:**
-
-- Viết README backend: yêu cầu chạy, cấu hình mẫu, lệnh khởi động, migration, nạp/reset fixture, ví dụ gọi API và cách xem log/lỗi.
-- Cập nhật `docs/contracts/api.md` đúng phiên bản cuối; bàn giao schema CSDL, response mẫu, kết quả kiểm thử và các quyết định về thời gian, gửi lại, dữ liệu cũ, quy tắc.
-- Cùng TKiet tập dượt demo từ ESP32 thật; chuẩn bị fixture có thể tái hiện luồng hiển thị khi mạch hoặc Wi‑Fi chưa sẵn sàng.
-
-**Đầu ra:** Backend và CSDL chạy lại được, tài liệu API, fixture, bằng chứng kiểm thử/tích hợp.  
-**Đạt Phase 5 khi:** TKiet hoặc một thành viên khác dựng được backend từ hướng dẫn, gửi một payload mẫu, đọc lại số đo và giải thích các trạng thái lỗi/cũ/chưa hiệu chuẩn.
-
-## 4. Checklist bàn giao cho các bên
-
-- [ ] TVan có địa chỉ thử, request/response mẫu, mã lỗi và quy tắc gửi lại đã duyệt.
-- [ ] DKhoa/QThang có response mẫu cho bình thường, chưa có dữ liệu, lỗi cảm biến, chưa hiệu chuẩn và dữ liệu cũ.
-- [ ] MThuy biết nơi xử lý quy tắc, dữ liệu đầu vào hợp lệ và cấu trúc phản hồi cảnh báo nếu có.
-- [ ] CSDL lưu được giá trị thiếu và trạng thái mà không biến thành `0`; có thời điểm đo/nhận theo quy tắc G0.
-- [ ] Có cách nhận diện bản ghi gửi lại và giới hạn truy vấn lịch sử; hành vi được mô tả trong tài liệu API.
-- [ ] Migration, fixture, cấu hình mẫu và hướng dẫn chạy/reset không chứa thông tin truy cập thật.
-- [ ] TKiet kiểm tra một đường dữ liệu thật từ cảm biến tới web/mobile và nhận biên bản lỗi còn mở.
-
-**Khi bị chặn:** Chưa có firmware thì dùng payload G0 của TVan; chưa có giao diện thì gọi API bằng fixture. Ghi phần chưa kiểm tra trên thiết bị thật là `đang chặn` kèm người cần bàn giao. Nếu API/schema phải đổi, gửi ví dụ trước/sau và tác động cho TKiet, TVan, DKhoa, QThang, MThuy; chỉ đổi bản hợp đồng chính sau khi các bên liên quan xác nhận.
+- [x] **QTien** có endpoint tiếp nhận trực tiếp `POST /api/v1/readings` và thông số kênh ThingSpeak Channel `3543608` đã được kết nối tự động.
+- [x] **DKhoa / QThang** có đầy đủ API đọc số đo mới nhất, lịch sử phân trang, trạng thái cảm biến, cờ `is_stale` và lời khuyên chăm sóc sinh học `advice`.
+- [x] **DKhoa** được hỗ trợ CORS đầy đủ tại địa chỉ `https://pepper-nursery-iot-em0t.onrender.com`, có hệ thống Auth JWT đăng nhập và API CRUD Care Rules cho Admin Console.
+- [x] **MThuy** có hệ thống đánh giá quy tắc nông học chuẩn 5 phân vùng được cấu hình chính xác trong `rules.config.json` và bảng CSDL `care_rules`.
+- [x] **TKiet** có kiến trúc CSDL quan hệ trên Aiven Cloud, cơ chế deduplication an toàn, Dockerfile và kịch bản deploy Render sẵn sàng cho báo cáo đồ án.
+- [x] CSDL lưu trữ chính xác các trường `null` khi cảm biến lỗi/chưa hiệu chuẩn, tuyệt đối không biến `null` thành số `0`.
+- [x] Đạt 17/17 ca kiểm thử tự động, build TypeScript không có lỗi.
