@@ -42,14 +42,21 @@ export class RuleService {
   }
 
   public loadConfig(): RulesConfig {
-    const configPath = path.resolve(__dirname, '../config/rules.config.json');
-    try {
-      if (fs.existsSync(configPath)) {
-        const raw = fs.readFileSync(configPath, 'utf-8');
-        return JSON.parse(raw);
+    const candidatePaths = [
+      path.resolve(__dirname, '../config/rules.config.json'),
+      path.resolve(process.cwd(), 'src/config/rules.config.json'),
+      path.resolve(process.cwd(), 'dist/config/rules.config.json'),
+    ];
+
+    for (const configPath of candidatePaths) {
+      try {
+        if (fs.existsSync(configPath)) {
+          const raw = fs.readFileSync(configPath, 'utf-8');
+          return JSON.parse(raw);
+        }
+      } catch (err) {
+        console.warn(`Could not load rules config from ${configPath}:`, err);
       }
-    } catch (err) {
-      console.warn('Could not load rules.config.json, using fallback default.', err);
     }
 
     return {
