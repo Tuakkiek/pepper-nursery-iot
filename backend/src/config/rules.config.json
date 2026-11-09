@@ -1,61 +1,127 @@
 {
-  "version": "0.1-draft",
+  "version": "0.1",
   "enabled": false,
-  "description": "Cấu hình ngưỡng quy tắc chăm sóc vườn ươm ớt con (Pepper Nursery). Mặc định enabled=false cho tới khi MThuy bàn giao phiên bản duyệt chính thức.",
+  "description": "Bộ quy tắc chăm sóc vườn ươm ớt con (Pepper Nursery G0 v0.1) được phê duyệt bởi Agronomy MThuy và TKiet.",
   "thresholds": {
     "air_temperature_c": {
-      "min_critical": 15.0,
-      "min_optimal": 22.0,
-      "max_optimal": 32.0,
-      "max_critical": 38.0,
+      "min_critical": 16.0,
+      "min_optimal": 20.0,
+      "max_optimal": 28.0,
+      "max_critical": 32.0,
       "unit": "°C",
       "messages": {
-        "too_cold": "Nhiệt độ không khí quá thấp (< {val}°C), có nguy cơ làm chậm phát triển cây ớt con.",
-        "too_hot": "Nhiệt độ không khí quá cao (> {val}°C), cần che chắn hoặc làm mát vườn ươm."
+        "too_cold_critical": "Nhiệt độ không khí cực thấp (< {val}°C), có nguy cơ làm chết cóng cây ớt con.",
+        "too_cold_warning": "Nhiệt độ không khí thấp (< {val}°C), làm chậm sinh trưởng cây con.",
+        "too_hot_warning": "Nhiệt độ không khí cao (> {val}°C), làm tăng thoát hơi nước ở lá.",
+        "too_hot_critical": "Nhiệt độ không khí cực cao (> {val}°C), nguy cơ cháy lá non và sốc nhiệt."
+      },
+      "actions": {
+        "too_cold_critical": "Che chắn gió lùa, phủ nylon giữ ấm, bật đèn sưởi.",
+        "too_cold_warning": "Khép bớt cửa gió, tránh tưới nước lạnh sáng sớm.",
+        "too_hot_warning": "Mở thông gió, kéo lưới che 30% nắng.",
+        "too_hot_critical": "Kéo lưới che 70% nắng, bật phun sương mái làm mát."
       }
     },
     "air_humidity_pct": {
+      "min_critical": 50.0,
       "min_optimal": 60.0,
-      "max_optimal": 80.0,
-      "unit": "%",
-      "messages": {
-        "too_dry": "Độ ẩm không khí thấp (< {val}%), không khí khô làm tăng thoát hơi nước ở lá non.",
-        "too_humid": "Độ ẩm không khí cao (> {val}%), nguy cơ phát sinh nấm bệnh trong vườn ươm."
-      }
-    },
-    "soil_moisture_pct": {
-      "min_critical": 35.0,
-      "min_optimal": 50.0,
-      "max_optimal": 70.0,
+      "max_optimal": 75.0,
       "max_critical": 85.0,
       "unit": "%",
       "messages": {
-        "too_dry": "Độ ẩm đất thấp (< {val}%), giá thể bị khô hạn, cần bổ sung nước tưới.",
-        "too_wet": "Độ ẩm đất quá cao (> {val}%), nguy cơ úng rễ cây ớt con, cần giãn cữ tưới."
+        "too_dry_critical": "Độ ẩm không khí cực thấp (< {val}%), không khí khô hạn gay gắt.",
+        "too_dry_warning": "Độ ẩm không khí thấp (< {val}%), lá non dễ bị mất nước héo rũ.",
+        "too_humid_warning": "Độ ẩm không khí cao (> {val}%), độ ẩm lớn kéo dài.",
+        "too_humid_critical": "Độ ẩm không khí cực cao (> {val}%), đọng nước trên lá dễ bùng phát nấm bệnh."
+      },
+      "actions": {
+        "too_dry_critical": "Bật phun sương làm ẩm không gian, tưới nền.",
+        "too_dry_warning": "Phun sương nhẹ giữ ẩm không khí.",
+        "too_humid_warning": "Tăng thông gió, tránh tưới chiều tối.",
+        "too_humid_critical": "Mở tối đa cửa gió, quạt đối lưu, rắc vôi bột lối đi."
+      }
+    },
+    "soil_moisture_pct": {
+      "min_critical": 55.0,
+      "min_optimal": 65.0,
+      "max_optimal": 80.0,
+      "max_critical": 85.0,
+      "unit": "%",
+      "messages": {
+        "too_dry_critical": "Độ ẩm đất cực thấp (< {val}%), giá thể kiệt nước rễ non bị teo héo.",
+        "too_dry_warning": "Độ ẩm đất thấp (< {val}%), giá thể bắt đầu khô se mặt.",
+        "too_wet_warning": "Độ ẩm đất cao (> {val}%), giá thể thừa ẩm.",
+        "too_wet_critical": "Độ ẩm đất cực cao (> {val}%), rễ ớt con bị ngập úng ngạt khí."
+      },
+      "actions": {
+        "too_dry_critical": "Tưới bù ẩm khẩn cấp bằng phun sương mịn đều mặt khay.",
+        "too_dry_warning": "Chuẩn bị tưới bổ sung nước sạch trong 1-2h tới.",
+        "too_wet_warning": "Tạm dừng cữ tưới tiếp theo, chờ se mặt giá thể.",
+        "too_wet_critical": "Ngừng tưới ngay, kê khay xốp cao 20cm, thông gió đáy."
+      }
+    },
+    "soil_temperature_c": {
+      "min_critical": 18.0,
+      "min_optimal": 22.0,
+      "max_optimal": 28.0,
+      "max_critical": 32.0,
+      "unit": "°C",
+      "messages": {
+        "too_cold_critical": "Nhiệt độ rễ cực thấp (< {val}°C), rễ ngừng hấp thu dinh dưỡng.",
+        "too_cold_warning": "Nhiệt độ rễ thấp (< {val}°C), rễ phát triển chậm.",
+        "too_hot_warning": "Nhiệt độ rễ cao (> {val}°C), giá thể bị nóng.",
+        "too_hot_critical": "Nhiệt độ rễ cực cao (> {val}°C), rễ non bị tổn thương do giá thể quá nhiệt."
+      },
+      "actions": {
+        "too_cold_critical": "Kê khay cách đất 20cm, rơm rạ cách nhiệt đáy luống.",
+        "too_cold_warning": "Tưới nước lúc ấm (khoảng 10h sáng).",
+        "too_hot_warning": "Tránh nắng rọi trực tiếp vào thành khay xốp.",
+        "too_hot_critical": "Tưới làm mát bằng nước mát nhẹ, che nắng xiên."
       }
     },
     "water_ph": {
-      "min_optimal": 6.0,
+      "min_critical": 5.3,
+      "min_optimal": 5.8,
       "max_optimal": 6.8,
+      "max_critical": 7.5,
       "unit": "pH",
       "messages": {
-        "too_acidic": "Nước tưới có tính axit cao (pH < {val}), cần điều chỉnh trước khi tưới.",
-        "too_alkaline": "Nước tưới có tính kiềm cao (pH > {val}), rễ cây con khó hấp thu dinh dưỡng."
+        "too_acid_critical": "Độ pH nước tưới cực thấp (< {val}), nước bị chua đậm làm cháy rễ non.",
+        "too_acid_warning": "Độ pH nước tưới thấp (< {val}), rễ khó hấp thu khoáng chất.",
+        "too_alkaline_warning": "Độ pH nước tưới hơi kiềm (> {val}), cần chú ý dinh dưỡng vi lượng.",
+        "too_alkaline_critical": "Độ pH nước tưới cực cao (> {val}), kiềm hóa làm kết tủa phân bón."
+      },
+      "actions": {
+        "too_acid_critical": "Tuyệt đối không tưới! Dùng nước vôi trong nâng pH lên 6.0-6.5.",
+        "too_acid_warning": "Châm thêm nước giếng sạch hoặc sục khí bể chứa.",
+        "too_alkaline_warning": "Theo dõi gân lá non, chuẩn bị điều chỉnh nhẹ pH.",
+        "too_alkaline_critical": "Tuyệt đối không tưới! Dùng axit citric hữu cơ hạ pH về 6.0-6.5."
       }
     },
     "water_tds_ppm": {
-      "min_optimal": 450.0,
-      "max_optimal": 750.0,
+      "min_critical": 100.0,
+      "min_optimal": 200.0,
+      "max_optimal": 450.0,
+      "max_critical": 850.0,
       "unit": "ppm",
       "messages": {
-        "too_low": "Chỉ số TDS nước tưới thấp (< {val} ppm), nồng độ dinh dưỡng loãng.",
-        "too_high": "Chỉ số TDS nước tưới cao (> {val} ppm), dung dịch quá đặc có thể gây xót rễ non."
+        "too_low_critical": "Chỉ số TDS nước cực thấp (< {val} ppm), nước nghèo kiệt khoáng chất.",
+        "too_low_warning": "Chỉ số TDS nước thấp (< {val} ppm), dinh dưỡng loãng.",
+        "too_high_warning": "Chỉ số TDS nước cao (> {val} ppm), nồng độ muối khoáng bắt đầu đậm đặc.",
+        "too_high_critical": "Chỉ số TDS nước cực cao (> {val} ppm), nguy cơ ngộ độc phân và xót rễ."
+      },
+      "actions": {
+        "too_low_critical": "Nước nghèo khoáng; sau 15 ngày châm nhẹ hữu cơ vi sinh.",
+        "too_low_warning": "Nước sạch an toàn cho cây con dưới 10 ngày tuổi.",
+        "too_high_warning": "Pha loãng thêm 30-50% nước sạch trước khi tưới.",
+        "too_high_critical": "Nguy hiểm khẩn cấp! Ngừng tưới, xả nước sạch rửa trôi muối."
       }
     }
   },
   "default_messages": {
-    "optimal": "Các chỉ số môi trường vườn ươm ớt con đang ở mức tối ưu.",
-    "insufficient_data": "Chưa đủ dữ liệu cảm biến hợp lệ hoặc cảm biến chưa hiệu chuẩn để đưa ra lời khuyên chăm sóc."
+    "optimal": "Tuyệt vời: Môi trường vườn ươm ớt con đang ở điều kiện sinh trưởng lý tưởng nhất!",
+    "optimal_action": "Duy trì chế độ thông gió và lịch tưới ổn định hiện tại (1-2 lần/ngày).",
+    "insufficient_data": "Dữ liệu cảm biến không đủ hoặc đã cũ, không thể đánh giá tình trạng vườn ươm.",
+    "insufficient_data_action": "Kiểm tra lại kết nối phần cứng, nguồn điện trạm ESP32 hoặc hoàn tất hiệu chuẩn cảm biến."
   }
 }
-

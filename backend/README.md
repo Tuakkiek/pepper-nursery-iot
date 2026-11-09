@@ -144,8 +144,8 @@ Các bạn có thể phát triển giao diện độc lập mà không cần ch�
 
 ---
 
-### 4.2. Dành cho TVan (Firmware ESP32)
-* **Endpoint gửi số đo:**
+### 4.2. Dành cho QTien (Firmware ESP32 / Cảm biến / ThingSpeak)
+* **Endpoint gửi số đo trực tiếp (REST Ingest dự phòng):**
   ```http
   POST /api/v1/readings
   Content-Type: application/json
@@ -157,6 +157,7 @@ Các bạn có thể phát triển giao diện độc lập mà không cần ch�
   * **409 Conflict:** Cùng `sample_id` nhưng nội dung payload bị thay đổi (`sample_conflict`).
   * **400 Bad Request:** Payload sai schema, thiếu 5 trạng thái cảm biến hoặc sai kiểu dữ liệu (`invalid_reading`).
   * **500 Server Error:** Lỗi máy chủ tạm thời (`server_error`).
+* **Lưu ý:** Nhiệm vụ truyền dữ liệu và kết nối mạng Wi-Fi của TVan đã được QTien đảm nhiệm và hợp nhất toàn diện từ đầu dự án qua mã nguồn `ESP32_CayOt/ESP32_CayOt.ino` và kênh ThingSpeak `3543608`.
 
 ---
 
@@ -268,5 +269,31 @@ Content-Type: application/json
 DELETE /api/v1/rules/:id
 Authorization: Bearer <admin_token>
 ```
+
+---
+
+## 5. Triển khai Production & Docker (Phase 5 Handover)
+
+### 5.1. Triển khai bằng Docker
+Dự án đã chuẩn bị sẵn `Dockerfile` multi-stage build tối ưu kích thước image:
+```bash
+# Build image
+docker build -t pepper-nursery-backend:latest .
+
+# Khởi chạy container
+docker run -d \
+  --name pepper-backend \
+  -p 8000:8000 \
+  --env-file .env \
+  pepper-nursery-backend:latest
+```
+
+### 5.2. Triển khai trên Render Cloud
+- **Build Command:** `npm ci && npm run build`
+- **Start Command:** `npm start` (hoặc `node dist/server.js`)
+- **Port:** `8000`
+- **Health Check Path:** `/api/v1/health`
+- **Địa chỉ triển khai chính thức:** `https://pepper-nursery-iot.onrender.com`
+
 
 
