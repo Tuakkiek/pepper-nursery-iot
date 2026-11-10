@@ -5,7 +5,6 @@ import CareAdviceBanner from './components/CareAdviceBanner.jsx';
 import MetricGrid from './components/MetricGrid.jsx';
 import HistorySection from './components/HistorySection.jsx';
 import AdminConsole from './components/AdminConsole.jsx';
-import ContractPlayground from './components/ContractPlayground.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import LoginPage from './components/LoginPage.jsx';
 import Toast from './components/Toast.jsx';
@@ -16,9 +15,7 @@ import { authService } from './services/auth.js';
 
 export default function App() {
   const [deviceId, setDeviceId] = useState(APP_CONFIG.defaultDeviceId);
-  const [dataMode, setDataMode] = useState(APP_CONFIG.dataMode);
-  const [currentScenario, setCurrentScenario] = useState(APP_CONFIG.currentScenario);
-  
+
   const [user, setUser] = useState(authService.getUser());
   // Khởi tạo tab: Nếu tài khoản là admin thì vào thẳng trang 'admin', còn user kỹ thuật thì vào trang 'live' (số đo)
   const [activeTab, setActiveTab] = useState(() => {
@@ -65,35 +62,33 @@ export default function App() {
 
     try {
       // 1. Fetch Latest
-      const latest = await apiService.getLatestReading(deviceId, dataMode, currentScenario);
+      const latest = await apiService.getLatestReading(deviceId, 'REAL_API');
       setLatestData(latest);
       if (latest._is_fallback) {
         showToast('Đang kết nối qua cổng dự phòng Sensor Data Bridge', 'info');
       }
 
       // 2. Fetch History (Limit 20)
-      const history = await apiService.getHistory(deviceId, 20, dataMode);
+      const history = await apiService.getHistory(deviceId, 20, 'REAL_API');
       setHistoryData(history);
     } catch (err) {
       setError(err);
-      if (dataMode === 'REAL_API') {
-        showToast(`Lỗi nạp số đo từ API: ${err.message}`, 'error');
-      }
+      showToast(`Lỗi nạp số đo từ API: ${err.message}`, 'error');
     } finally {
       if (showLoadingSpinner) setIsLoading(false);
     }
   };
 
-  // Nạp số đo khi thay đổi thiết bị hoặc kịch bản (chỉ khi đang ở tab xem số đo)
+  // Nạp số đo khi thay đổi thiết bị (chỉ khi đang ở tab xem số đo)
   useEffect(() => {
     if (user && activeTab === 'live') {
       loadData(true);
     }
-  }, [deviceId, dataMode, currentScenario, user, activeTab]);
+  }, [deviceId, user, activeTab]);
 
   // Auto-refresh interval (chỉ nạp định kỳ khi đang ở tab 'live')
   useEffect(() => {
-    if (user && activeTab === 'live' && dataMode === 'REAL_API') {
+    if (user && activeTab === 'live') {
       refreshIntervalRef.current = setInterval(() => {
         loadData(false);
       }, APP_CONFIG.autoRefreshIntervalMs);
@@ -102,7 +97,7 @@ export default function App() {
     return () => {
       if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
     };
-  }, [user, activeTab, dataMode, deviceId]);
+  }, [user, activeTab, deviceId]);
 
   // Sync Telemetry (Sensor Data Bridge / ThingSpeak - Section 4)
   const handleSyncThingSpeak = async () => {
@@ -122,13 +117,6 @@ export default function App() {
     authService.clearSession();
     setUser(null);
     showToast('Đã đăng xuất khỏi hệ thống', 'info');
-  };
-
-  const handleSelectScenarioFromSandbox = (scenarioId) => {
-    setDataMode('FIXTURE');
-    setCurrentScenario(scenarioId);
-    setActiveTab('live');
-    showToast(`Đã chuyển sang kịch bản mock: ${scenarioId}`, 'success');
   };
 
   // CƠ CHẾ BẢO VỆ CỔNG VÀO (GATEKEEPER): Bắt buộc người dùng phải đăng nhập trước khi vào hệ thống
@@ -163,13 +151,9 @@ export default function App() {
       {activeTab !== 'admin' && (
         <>
           {/* Header dành cho Trang Người dùng */}
-          <Navbar 
+          <Navbar
             deviceId={deviceId}
             setDeviceId={setDeviceId}
-            dataMode={dataMode}
-            setDataMode={setDataMode}
-            currentScenario={currentScenario}
-            setCurrentScenario={setCurrentScenario}
             onRefresh={() => loadData(true)}
             onSyncThingSpeak={handleSyncThingSpeak}
             isLoading={isLoading}
@@ -231,12 +215,6 @@ export default function App() {
                 <button className="btn btn-danger btn-sm" onClick={() => loadData(true)}>
                   Thử lại
                 </button>
-                <button 
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => { setDataMode('FIXTURE'); setCurrentScenario('normal'); }}
-                >
-                  Chuyển sang Dữ liệu mẫu (Fixture G0)
-                </button>
               </div>
             </div>
           )}
@@ -263,13 +241,6 @@ export default function App() {
               {/* Historical Trends & Table */}
               <HistorySection historyData={historyData} />
             </main>
-          )}
-
-          {activeTab === 'sandbox' && (
-            <ContractPlayground 
-              currentScenario={currentScenario}
-              onSelectScenario={handleSelectScenarioFromSandbox}
-            />
           )}
 
           {/* Footer trang người dùng */}
