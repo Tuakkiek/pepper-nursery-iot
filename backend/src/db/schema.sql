@@ -3,8 +3,11 @@
 CREATE TABLE IF NOT EXISTS devices (
   device_id VARCHAR(64) NOT NULL PRIMARY KEY,
   name VARCHAR(128) NOT NULL,
+  owner_id INT NULL,
   description TEXT NULL,
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_devices_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_devices_owner (owner_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS readings (

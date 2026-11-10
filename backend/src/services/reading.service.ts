@@ -108,10 +108,10 @@ export class ReadingService {
 
   async resolveDevice(
     deviceIdOrName: string
-  ): Promise<{ device_id: string; name: string; description: string | null } | null> {
+  ): Promise<{ device_id: string; name: string; owner_id: number | null; description: string | null } | null> {
     const raw = String(deviceIdOrName).trim();
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT device_id, name, description FROM devices WHERE device_id = ? OR name = ? LIMIT 1`,
+      `SELECT device_id, name, owner_id, description FROM devices WHERE device_id = ? OR name = ? LIMIT 1`,
       [raw, raw]
     );
     if (rows.length > 0) {
@@ -123,6 +123,7 @@ export class ReadingService {
       return {
         device_id: '1',
         name: 'esp32-nursery-01',
+        owner_id: null,
         description: 'Trạm vườn ươm ớt (Sensor Data Bridge Channel 1)',
       };
     }
@@ -185,6 +186,227 @@ export class ReadingService {
       device_id: data.device_id,
       name: data.name,
       description: data.description || null,
+    };
+  }
+
+  async claimDeviceForUser(
+    userId: number,
+    deviceIdOrName: string,
+    customName?: string
+  ): Promise<{
+    status: 'ok' | 'conflict' | 'not_found';
+    message: string;
+    device?: any;
+  }> {
+    const raw = String(deviceIdOrName).trim();
+    if (!raw) {
+      return { status: 'not_found', message: 'Vui lòng cung cấp mã hoặc tên thiết bị' };
+    }
+
+    // 1. Check if device exists or auto-register
+    let dev = await this.resolveDevice(raw);
+    if (!dev) {
+      const newName = customName || (raw === '1' ? 'esp32-nursery-01' : `Trạm ${raw}`);
+      await pool.query(
+        `INSERT INTO devices (device_id, name, owner_id, description)
+         VALUES (?, ?, ?, ?)`,
+        [raw, newName, userId, `Thiết bị cấp theo mã phần cứng (${raw})`]
+      );
+      dev = {
+        device_id: raw,
+        name: newName,
+        owner_id: userId,
+        description: `Thiết bị cấp theo mã phần cứng (${raw})`,
+      };
+    } else {
+      // 2. Check ownership
+      if (dev.owner_id && dev.owner_id !== userId) {
+        return {
+          status: 'conflict',
+          message: 'Thiết bị này đã được liên kết với một tài khoản khác. Mỗi thiết bị chỉ liên kết với 1 tài khoản.',
+        };
+      }
+
+      // 3. Link device to this user & optionally update display name
+      const targetName = customName ? customName.trim() : dev.name;
+      await pool.query(
+        `UPDATE devices SET owner_id = ?, name = ? WHERE device_id = ?`,
+        [userId, targetName, dev.device_id]
+      );
+      dev.owner_id = userId;
+      dev.name = targetName;
+    }
+
+    // 4. Update user's active device if none set
+    const [userRows] = await pool.query<RowDataPacket[]>(
+      `SELECT selected_device_id FROM users WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+    if (userRows.length > 0 && !userRows[0].selected_device_id) {
+      await pool.query(`UPDATE users SET selected_device_id = ? WHERE id = ?`, [dev.device_id, userId]);
+    }
+
+    const latest = await this.getLatestReading(dev.device_id);
+    return {
+      status: 'ok',
+      message: 'Thêm thiết bị vào tài khoản thành công',
+      device: {
+        device_id: dev.device_id,
+        name: dev.name,
+        description: dev.description,
+        is_online: latest && latest.is_stale === false && latest.reading !== null,
+        latest_reading: latest?.reading || null,
+      },
+    };
+  }
+
+  async getUserDevices(userId: number): Promise<{
+    active_device_id: string | null;
+    total: number;
+    devices: any[];
+  }> {
+    const [userRows] = await pool.query<RowDataPacket[]>(
+      `SELECT selected_device_id FROM users WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+    const activeDeviceId = userRows.length > 0 ? userRows[0].selected_device_id : null;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT device_id, name, description, created_at
+       FROM devices
+       WHERE owner_id = ?
+       ORDER BY created_at ASC`,
+      [userId]
+    );
+
+    const devices = [];
+    for (const r of rows) {
+      const latest = await this.getLatestReading(r.device_id);
+      const isOnline = latest && latest.is_stale === false && latest.reading !== null;
+      devices.push({
+        device_id: r.device_id,
+        name: r.name,
+        description: r.description,
+        created_at: formatUtcIso(r.created_at) || new Date().toISOString(),
+        is_active: r.device_id === activeDeviceId,
+        is_online: Boolean(isOnline),
+        latest_reading: latest?.reading || null,
+        latest_advice: latest?.advice || null,
+      });
+    }
+
+    return {
+      active_device_id: activeDeviceId,
+      total: devices.length,
+      devices,
+    };
+  }
+
+  async updateUserDeviceName(
+    userId: number,
+    deviceId: string,
+    newName: string
+  ): Promise<{ status: 'ok' | 'forbidden' | 'not_found'; message?: string; device?: any }> {
+    const dev = await this.resolveDevice(deviceId);
+    if (!dev) {
+      return { status: 'not_found', message: `Thiết bị '${deviceId}' không tồn tại` };
+    }
+    if (dev.owner_id !== userId) {
+      return { status: 'forbidden', message: 'Bạn không có quyền đổi tên thiết bị này' };
+    }
+
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      return { status: 'not_found', message: 'Tên thiết bị không được để trống' };
+    }
+
+    await pool.query(`UPDATE devices SET name = ? WHERE device_id = ? AND owner_id = ?`, [
+      trimmedName,
+      dev.device_id,
+      userId,
+    ]);
+
+    return {
+      status: 'ok',
+      message: 'Cập nhật tên thiết bị thành công',
+      device: {
+        device_id: dev.device_id,
+        name: trimmedName,
+      },
+    };
+  }
+
+  async removeUserDevice(
+    userId: number,
+    deviceId: string
+  ): Promise<{
+    status: 'ok' | 'forbidden' | 'not_found';
+    message?: string;
+    remaining_devices_count?: number;
+    active_device_id?: string | null;
+  }> {
+    const dev = await this.resolveDevice(deviceId);
+    if (!dev) {
+      return { status: 'not_found', message: `Thiết bị '${deviceId}' không tồn tại` };
+    }
+    if (dev.owner_id !== userId) {
+      return { status: 'forbidden', message: 'Bạn không có quyền xóa thiết bị này khỏi tài khoản' };
+    }
+
+    // 1. Unlink device (set owner_id = NULL)
+    await pool.query(`UPDATE devices SET owner_id = NULL WHERE device_id = ? AND owner_id = ?`, [
+      dev.device_id,
+      userId,
+    ]);
+
+    // 2. Check remaining devices
+    const [remRows] = await pool.query<RowDataPacket[]>(
+      `SELECT device_id FROM devices WHERE owner_id = ? ORDER BY created_at ASC`,
+      [userId]
+    );
+
+    let nextActiveId: string | null = null;
+    if (remRows.length > 0) {
+      nextActiveId = remRows[0].device_id;
+    }
+
+    // 3. Update user's selected_device_id if they removed active device
+    await pool.query(
+      `UPDATE users
+       SET selected_device_id = ?
+       WHERE id = ? AND selected_device_id = ?`,
+      [nextActiveId, userId, dev.device_id]
+    );
+
+    return {
+      status: 'ok',
+      message: 'Đã xóa thiết bị khỏi tài khoản thành công',
+      remaining_devices_count: remRows.length,
+      active_device_id: nextActiveId,
+    };
+  }
+
+  async setUserActiveDevice(
+    userId: number,
+    deviceId: string
+  ): Promise<{ status: 'ok' | 'forbidden' | 'not_found'; message?: string; active_device_id?: string }> {
+    const dev = await this.resolveDevice(deviceId);
+    if (!dev) {
+      return { status: 'not_found', message: `Thiết bị '${deviceId}' không tồn tại` };
+    }
+    if (dev.owner_id && dev.owner_id !== userId) {
+      return { status: 'forbidden', message: 'Thiết bị này không thuộc tài khoản của bạn' };
+    }
+
+    await pool.query(`UPDATE users SET selected_device_id = ? WHERE id = ?`, [
+      dev.device_id,
+      userId,
+    ]);
+
+    return {
+      status: 'ok',
+      message: 'Đã chuyển thiết bị hiển thị mặc định',
+      active_device_id: dev.device_id,
     };
   }
 

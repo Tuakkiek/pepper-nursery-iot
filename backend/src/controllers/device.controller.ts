@@ -99,6 +99,180 @@ export async function createDeviceHandler(req: Request, res: Response): Promise<
   }
 }
 
+export async function claimUserDeviceHandler(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      error: { code: 'unauthorized', message: 'Authentication required' },
+    });
+    return;
+  }
+
+  const deviceInput = req.body.device_id || req.body.id || req.body.name;
+  const customName = req.body.custom_name || (req.body.name !== deviceInput ? req.body.name : undefined);
+
+  if (!deviceInput) {
+    res.status(400).json({
+      error: { code: 'missing_device_id', message: 'Field device_id (mã trên thiết bị) is required' },
+    });
+    return;
+  }
+
+  try {
+    const result = await readingService.claimDeviceForUser(req.user.id, String(deviceInput), customName);
+    if (result.status === 'conflict') {
+      res.status(409).json({
+        error: { code: 'device_already_claimed', message: result.message },
+      });
+      return;
+    }
+    if (result.status === 'not_found') {
+      res.status(400).json({
+        error: { code: 'invalid_device', message: result.message },
+      });
+      return;
+    }
+
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Error claiming device:', err);
+    res.status(500).json({
+      error: { code: 'server_error', message: 'Failed to claim device' },
+    });
+  }
+}
+
+export async function getUserDevicesHandler(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      error: { code: 'unauthorized', message: 'Authentication required' },
+    });
+    return;
+  }
+
+  try {
+    const result = await readingService.getUserDevices(req.user.id);
+    res.status(200).json({
+      status: 'ok',
+      ...result,
+    });
+  } catch (err: any) {
+    console.error('Error getting user devices:', err);
+    res.status(500).json({
+      error: { code: 'server_error', message: 'Failed to get user devices' },
+    });
+  }
+}
+
+export async function updateUserDeviceNameHandler(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      error: { code: 'unauthorized', message: 'Authentication required' },
+    });
+    return;
+  }
+
+  const deviceId = req.params.device_id;
+  const newName = req.body.name || req.body.custom_name;
+
+  if (!newName) {
+    res.status(400).json({
+      error: { code: 'missing_name', message: 'Tên hiển thị mới không được để trống' },
+    });
+    return;
+  }
+
+  try {
+    const result = await readingService.updateUserDeviceName(req.user.id, deviceId, newName);
+    if (result.status === 'not_found') {
+      res.status(404).json({
+        error: { code: 'device_not_found', message: result.message },
+      });
+      return;
+    }
+    if (result.status === 'forbidden') {
+      res.status(403).json({
+        error: { code: 'forbidden', message: result.message },
+      });
+      return;
+    }
+
+    res.status(200).json(result);
+  } catch (err: any) {
+    console.error('Error updating device name:', err);
+    res.status(500).json({
+      error: { code: 'server_error', message: 'Failed to update device name' },
+    });
+  }
+}
+
+export async function removeUserDeviceHandler(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      error: { code: 'unauthorized', message: 'Authentication required' },
+    });
+    return;
+  }
+
+  const deviceId = req.params.device_id;
+
+  try {
+    const result = await readingService.removeUserDevice(req.user.id, deviceId);
+    if (result.status === 'not_found') {
+      res.status(404).json({
+        error: { code: 'device_not_found', message: result.message },
+      });
+      return;
+    }
+    if (result.status === 'forbidden') {
+      res.status(403).json({
+        error: { code: 'forbidden', message: result.message },
+      });
+      return;
+    }
+
+    res.status(200).json(result);
+  } catch (err: any) {
+    console.error('Error removing device:', err);
+    res.status(500).json({
+      error: { code: 'server_error', message: 'Failed to remove device' },
+    });
+  }
+}
+
+export async function setActiveDeviceHandler(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      error: { code: 'unauthorized', message: 'Authentication required' },
+    });
+    return;
+  }
+
+  const deviceId = req.params.device_id;
+
+  try {
+    const result = await readingService.setUserActiveDevice(req.user.id, deviceId);
+    if (result.status === 'not_found') {
+      res.status(404).json({
+        error: { code: 'device_not_found', message: result.message },
+      });
+      return;
+    }
+    if (result.status === 'forbidden') {
+      res.status(403).json({
+        error: { code: 'forbidden', message: result.message },
+      });
+      return;
+    }
+
+    res.status(200).json(result);
+  } catch (err: any) {
+    console.error('Error setting active device:', err);
+    res.status(500).json({
+      error: { code: 'server_error', message: 'Failed to set active device' },
+    });
+  }
+}
+
 export async function getLatestReadingHandler(req: Request, res: Response): Promise<void> {
   const device_id = resolveRequestedDeviceId(req);
 

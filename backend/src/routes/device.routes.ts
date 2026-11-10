@@ -6,9 +6,22 @@ import {
   getLatestReadingHandler,
   getHistoryReadingsHandler,
   getRangeReadingsHandler,
+  claimUserDeviceHandler,
+  getUserDevicesHandler,
+  updateUserDeviceNameHandler,
+  removeUserDeviceHandler,
+  setActiveDeviceHandler,
 } from '../controllers/device.controller';
+import { authenticate } from '../middlewares/auth.middleware';
 
 export const deviceRouter = Router();
+
+// User devices management routes (/devices/my...)
+deviceRouter.get('/my', authenticate, getUserDevicesHandler);
+deviceRouter.post('/my', authenticate, claimUserDeviceHandler);
+deviceRouter.patch('/my/:device_id', authenticate, updateUserDeviceNameHandler);
+deviceRouter.delete('/my/:device_id', authenticate, removeUserDeviceHandler);
+deviceRouter.put('/my/:device_id/active', authenticate, setActiveDeviceHandler);
 
 // GET /api/v1/devices (List all devices with latest reading & online status, ?search=...)
 deviceRouter.get('/', listDevicesHandler);

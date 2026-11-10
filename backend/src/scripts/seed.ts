@@ -133,12 +133,12 @@ export async function seedDatabase(): Promise<void> {
 
   // 1. Devices
   await pool.query(`
-    INSERT INTO devices (device_id, name, description)
+    INSERT INTO devices (device_id, name, owner_id, description)
     VALUES 
-      ('1', 'esp32-nursery-01', 'Trạm vườn ươm ớt (Sensor Data Bridge Channel 1)'),
-      ('esp32-nursery-01', 'Trạm vườn ươm ớt 01', 'Trạm thực tế gửi dữ liệu định kỳ'),
-      ('esp32-stale-01', 'Trạm kiểm thử dữ liệu cũ', 'Trạm mô phỏng mất kết nối (is_stale: true)'),
-      ('esp32-empty-01', 'Trạm mới chưa có dữ liệu', 'Trạm mới khởi tạo chưa có số đo (reading: null)')
+      ('1', 'esp32-nursery-01', NULL, 'Trạm vườn ươm ớt (Sensor Data Bridge Channel 1)'),
+      ('esp32-nursery-01', 'Trạm vườn ươm ớt 01', NULL, 'Trạm thực tế gửi dữ liệu định kỳ'),
+      ('esp32-stale-01', 'Trạm kiểm thử dữ liệu cũ', NULL, 'Trạm mô phỏng mất kết nối (is_stale: true)'),
+      ('esp32-empty-01', 'Trạm mới chưa có dữ liệu', NULL, 'Trạm mới khởi tạo chưa có số đo (reading: null)')
     ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description)
   `);
 

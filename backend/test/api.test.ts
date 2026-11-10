@@ -278,6 +278,63 @@ async function runTests() {
       console.log('✓ GET /devices/me/readings/latest passed');
     }
 
+    // 14f. Test Claim Device: POST /api/v1/user/devices
+    {
+      const res = await request('/api/v1/user/devices', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: { device_id: '1', custom_name: 'Vườn ươm ớt Khay A' },
+      });
+      console.assert(res.status === 201, `Claim device expected 201, got ${res.status}`);
+      console.assert(res.body.device.name === 'Vườn ươm ớt Khay A', 'custom name should match');
+      console.log('✓ POST /user/devices (claim device for account) passed');
+    }
+
+    // 14g. Test Get User Devices: GET /api/v1/user/devices
+    {
+      const res = await request('/api/v1/user/devices', {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      console.assert(res.status === 200, `Get user devices expected 200, got ${res.status}`);
+      console.assert(res.body.total >= 1, 'should have at least 1 device');
+      console.assert(res.body.devices[0].device_id === '1', 'device_id should match');
+      console.log('✓ GET /user/devices (list user devices) passed');
+    }
+
+    // 14h. Test Rename Device: PATCH /api/v1/user/devices/1
+    {
+      const res = await request('/api/v1/user/devices/1', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: { name: 'Vườn ươm ớt Siêu Cay Khay 1' },
+      });
+      console.assert(res.status === 200, `Rename device expected 200, got ${res.status}`);
+      console.assert(res.body.device.name === 'Vườn ươm ớt Siêu Cay Khay 1', 'name updated');
+      console.log('✓ PATCH /user/devices/:id (rename display name) passed');
+    }
+
+    // 14i. Test Claim Conflict: Admin cannot claim device '1' while owned by user
+    {
+      const res = await request('/api/v1/user/devices', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: { device_id: '1' },
+      });
+      console.assert(res.status === 409, `Expected 409 Conflict, got ${res.status}`);
+      console.assert(res.body.error.code === 'device_already_claimed', 'expected device_already_claimed');
+      console.log('✓ POST /user/devices conflict (already claimed by another user) passed');
+    }
+
+    // 14j. Test Remove Device: DELETE /api/v1/user/devices/1
+    {
+      const res = await request('/api/v1/user/devices/1', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      console.assert(res.status === 200, `Remove device expected 200, got ${res.status}`);
+      console.log('✓ DELETE /user/devices/:id (remove device from account) passed');
+    }
+
     // 15. Test Rules: GET /api/v1/rules
     {
       const res = await request('/api/v1/rules');

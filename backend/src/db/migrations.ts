@@ -9,10 +9,24 @@ export async function runMigrations(): Promise<void> {
       CREATE TABLE IF NOT EXISTS devices (
         device_id VARCHAR(64) NOT NULL PRIMARY KEY,
         name VARCHAR(128) NOT NULL,
+        owner_id INT NULL,
         description TEXT NULL,
-        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_devices_owner (owner_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Ensure owner_id column exists if devices table already existed
+    const [deviceColumns] = await conn.query<any[]>(
+      "SHOW COLUMNS FROM devices LIKE 'owner_id'"
+    );
+    if (!deviceColumns || deviceColumns.length === 0) {
+      await conn.query(`
+        ALTER TABLE devices
+        ADD COLUMN owner_id INT NULL AFTER name,
+        ADD INDEX idx_devices_owner (owner_id);
+      `);
+    }
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS readings (
