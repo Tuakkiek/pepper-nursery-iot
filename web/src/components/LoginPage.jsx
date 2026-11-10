@@ -12,7 +12,7 @@ export default function LoginPage({ onLoginSuccess, showToast }) {
           </div>
           <div className="login-brand-text">
             <h1>Vườn Ươm Ớt Con IoT</h1>
-            <p>Giám sát vi khí hậu và trạm cảm biến</p>
+            <p>Cổng quản trị hệ thống</p>
           </div>
         </div>
 
@@ -21,7 +21,7 @@ export default function LoginPage({ onLoginSuccess, showToast }) {
         </div>
 
         <footer className="login-footer">
-          Pepper Nursery IoT · Dashboard giám sát vườn ươm
+          Pepper Nursery IoT · Cổng quản trị Admin
         </footer>
       </div>
     </div>

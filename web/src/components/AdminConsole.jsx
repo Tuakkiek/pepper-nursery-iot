@@ -536,9 +536,9 @@ export default function AdminConsole({ user, onLogout, showToast }) {
                         <strong style={{ fontSize: '12px', color: 'var(--brand-navy)' }}>{techUsersCount} tài khoản</strong>
                       </div>
                       <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                        <li>Xem số đo cảm biến thời gian thực ở trang Giám sát người dùng</li>
-                        <li>Nhận thông báo và hướng dẫn chăm sóc tự động</li>
-                        <li>Chế độ xem chỉ đọc (Read-only) đối với quy tắc và người dùng</li>
+                        <li>Theo dõi số đo cảm biến thời gian thực trên ứng dụng Mobile</li>
+                        <li>Nhận cảnh báo và khuyến nghị chăm sóc tự động từ hệ thống</li>
+                        <li>Không có quyền truy cập vào cổng quản trị Web (Admin Console)</li>
                       </ul>
                     </div>
                   </div>
@@ -743,7 +743,7 @@ export default function AdminConsole({ user, onLogout, showToast }) {
                                 </span>
                               </td>
                               <td>
-                                <span className={`badge ${r.severity === 'critical' ? 'badge-error' : r.severity === 'warning' ? 'badge-warning' : 'badge-normal'}`}>
+                                <span className={`badge ${r.severity === 'danger' || r.severity === 'critical' ? 'badge-error' : r.severity === 'warning' ? 'badge-stale' : 'badge-normal'}`}>
                                   {r.severity}
                                 </span>
                               </td>
