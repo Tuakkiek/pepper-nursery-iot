@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
-import { X, KeyRound } from 'lucide-react';
+import { X, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/auth.js';
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
   const [tab, setTab] = useState('login'); // 'login' | 'register'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    setShowPassword(false);
+    setErrorMsg('');
+    onClose();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,7 +30,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
         const res = await authService.login(username, password);
         showToast(`Đăng nhập thành công! Xin chào ${res.user.full_name || res.user.username}`, 'success');
         onLoginSuccess(res.user);
-        onClose();
+        handleClose();
       } else {
         const res = await authService.register({
           username,
@@ -33,7 +40,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
         });
         showToast('Đăng ký tài khoản thành công! Đã tự động đăng nhập.', 'success');
         onLoginSuccess(res.user);
-        onClose();
+        handleClose();
       }
     } catch (err) {
       setErrorMsg(err.message);
@@ -43,7 +50,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -52,7 +59,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
               {tab === 'login' ? 'Đăng nhập Hệ thống' : 'Đăng ký Tài khoản'}
             </h3>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={handleClose}>
             <X size={20} />
           </button>
         </div>
@@ -62,14 +69,14 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
           <button 
             type="button"
             className={`segmented-btn ${tab === 'login' ? 'active' : ''}`}
-            onClick={() => { setTab('login'); setErrorMsg(''); }}
+            onClick={() => { setTab('login'); setErrorMsg(''); setShowPassword(false); }}
           >
             Đăng nhập
           </button>
           <button 
             type="button"
             className={`segmented-btn ${tab === 'register' ? 'active' : ''}`}
-            onClick={() => { setTab('register'); setErrorMsg(''); }}
+            onClick={() => { setTab('register'); setErrorMsg(''); setShowPassword(false); }}
           >
             Đăng ký mới
           </button>
@@ -113,19 +120,32 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
               placeholder="Nhập username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
             />
           </div>
 
           <div className="form-group">
             <label className="form-label">Mật khẩu</label>
-            <input 
-              type="password"
-              required
-              className="form-input"
-              placeholder="Nhập mật khẩu"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="password-input-wrap">
+              <input 
+                type={showPassword ? 'text' : 'password'}
+                required
+                className="form-input"
+                placeholder={tab === 'login' ? 'Nhập mật khẩu' : 'Mật khẩu tối thiểu 6 ký tự'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(prev => !prev)}
+                title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {tab === 'register' && (
@@ -143,7 +163,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose}>
               Hủy
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -16,12 +16,34 @@ import {
 import { apiService } from '../services/api.js';
 import RuleModal from './RuleModal.jsx';
 
+const PARAM_CONFIG = {
+  air_temperature_c: { label: 'Nhiệt độ KK', unit: '°C' },
+  air_humidity_pct: { label: 'Độ ẩm KK', unit: '%' },
+  soil_temperature_c: { label: 'Nhiệt độ đất', unit: '°C' },
+  soil_moisture_pct: { label: 'Độ ẩm đất', unit: '%' },
+  water_ph: { label: 'pH dung dịch', unit: '' },
+  water_tds_ppm: { label: 'TDS dung dịch', unit: 'ppm' },
+};
+
+const formatThreshold = (r) => {
+  const unit = PARAM_CONFIG[r.parameter]?.unit ? ` ${PARAM_CONFIG[r.parameter].unit}` : '';
+  if (r.operator === 'between') {
+    return `${r.threshold_min ?? '?'} ~ ${r.threshold_max ?? '?'}${unit}`;
+  }
+  if (r.operator === 'outside') {
+    return `< ${r.threshold_min} hoặc > ${r.threshold_max}${unit}`;
+  }
+  return `${r.operator} ${r.threshold_min ?? r.threshold_max ?? ''}${unit}`;
+};
+
 export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [paramFilter, setParamFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [pageSize, setPageSize] = useState('ALL'); // 'ALL' | 5 | 10 | 20
+  const [currentPage, setCurrentPage] = useState(1);
   const [tsStatus, setTsStatus] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -35,6 +57,10 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
     loadRules();
     loadThingSpeakStatus();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, paramFilter, statusFilter]);
 
   const loadRules = async () => {
     setLoading(true);
@@ -129,6 +155,14 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
     return matchSearch && matchParam && matchStatus;
   });
 
+  // Pagination calculation
+  const totalItems = filteredRules.length;
+  const itemsPerPage = pageSize === 'ALL' ? totalItems : Number(pageSize);
+  const totalPages = itemsPerPage > 0 ? Math.ceil(totalItems / itemsPerPage) : 1;
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages || 1);
+  const startIndex = pageSize === 'ALL' ? 0 : (validCurrentPage - 1) * itemsPerPage;
+  const displayedRules = pageSize === 'ALL' ? filteredRules : filteredRules.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Admin Role Guard Banner */}
@@ -195,9 +229,14 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
       {/* Rules Toolbar */}
       <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--brand-navy)' }}>
-            Danh sách Quy tắc Chăm sóc Cây ớt con
-          </h3>
+          <div>
+            <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
+              Danh sách Quy tắc Chăm sóc Cây ớt con
+            </h3>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Quản lý các ngưỡng an toàn và khuyến cáo kỹ thuật tự động cho vườn ươm
+            </span>
+          </div>
           {isAdmin && (
             <button 
               className="btn btn-primary btn-sm"
@@ -255,9 +294,19 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
           </button>
         </div>
 
-        {/* Rules Table */}
-        <div className="data-table-wrap">
-          <table className="data-table">
+        {/* Rules Table - Optimized to fit 1 page with NO horizontal scroll */}
+        <div className="rules-table-wrap">
+          <table className="rules-table">
+            <colgroup>
+              <col style={{ width: isAdmin ? '13%' : '14%' }} />
+              <col style={{ width: isAdmin ? '16%' : '17%' }} />
+              <col style={{ width: isAdmin ? '13%' : '14%' }} />
+              <col style={{ width: isAdmin ? '10%' : '11%' }} />
+              <col style={{ width: isAdmin ? '9%' : '10%' }} />
+              <col style={{ width: isAdmin ? '26%' : '27%' }} />
+              <col style={{ width: isAdmin ? '6%' : '7%' }} />
+              {isAdmin && <col style={{ width: '7%' }} />}
+            </colgroup>
             <thead>
               <tr>
                 <th>Mã quy tắc</th>
@@ -266,52 +315,57 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
                 <th>Điều kiện / Ngưỡng</th>
                 <th>Mức độ</th>
                 <th>Lời khuyên hành động</th>
-                <th>Trạng thái</th>
-                {isAdmin && <th>Thao tác</th>}
+                <th style={{ textAlign: 'center' }}>Trạng thái</th>
+                {isAdmin && <th style={{ textAlign: 'center' }}>Thao tác</th>}
               </tr>
             </thead>
             <tbody>
-              {filteredRules.length === 0 ? (
+              {displayedRules.length === 0 ? (
                 <tr>
                   <td colSpan={isAdmin ? 8 : 7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
                     Không tìm thấy quy tắc nào phù hợp.
                   </td>
                 </tr>
               ) : (
-                filteredRules.map(r => (
+                displayedRules.map(r => (
                   <tr key={r.id}>
                     <td><code>{r.rule_code}</code></td>
-                    <td style={{ fontWeight: 600 }}>{r.name}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{r.name}</td>
                     <td>
-                      <span className="badge badge-normal">{r.parameter}</span>
-                    </td>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                      {r.operator} {r.threshold_min ?? ''} {r.threshold_max ? `.. ${r.threshold_max}` : ''}
-                    </td>
-                    <td>
-                      <span className={`badge ${r.severity === 'danger' ? 'badge-error' : r.severity === 'warning' ? 'badge-stale' : 'badge-normal'}`}>
-                        {r.severity}
+                      <span className="badge badge-normal" style={{ fontSize: '11.5px', whiteSpace: 'normal', textAlign: 'center', display: 'inline-block' }}>
+                        {PARAM_CONFIG[r.parameter]?.label || r.parameter}
                       </span>
                     </td>
-                    <td style={{ maxWidth: '300px', whiteSpace: 'normal', fontSize: '12px' }}>
-                      {r.action_advice}
+                    <td style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px' }}>
+                      {formatThreshold(r)}
                     </td>
                     <td>
+                      <span className={`badge ${r.severity === 'danger' ? 'badge-error' : r.severity === 'warning' ? 'badge-stale' : 'badge-normal'}`} style={{ fontSize: '11px' }}>
+                        {r.severity === 'danger' ? 'Nguy hiểm' : r.severity === 'warning' ? 'Cảnh báo' : r.severity}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '12px', lineHeight: '1.35', color: 'var(--brand-navy)' }}>
+                        {r.action_advice}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
                       <button 
                         type="button"
                         onClick={() => handleToggleActive(r)}
                         className={`badge ${r.is_active ? 'badge-ok' : 'badge-empty'}`}
-                        style={{ cursor: isAdmin ? 'pointer' : 'default', border: 'none' }}
-                        title={isAdmin ? "Nhấn để bật/tắt" : ""}
+                        style={{ cursor: isAdmin ? 'pointer' : 'default', border: 'none', padding: '3px 6px', fontSize: '11px' }}
+                        title={isAdmin ? "Nhấn để bật/tắt quy tắc" : ""}
                       >
                         {r.is_active ? '● BẬT' : '○ TẮT'}
                       </button>
                     </td>
                     {isAdmin && (
-                      <td>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                           <button 
                             className="btn btn-secondary btn-sm"
+                            style={{ padding: '4px 6px' }}
                             onClick={() => { setEditingRule(r); setModalOpen(true); }}
                             title="Chỉnh sửa quy tắc"
                           >
@@ -319,6 +373,7 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
                           </button>
                           <button 
                             className="btn btn-danger btn-sm"
+                            style={{ padding: '4px 6px' }}
                             onClick={() => handleDeleteRule(r.id, r.rule_code)}
                             title="Xóa quy tắc"
                           >
@@ -332,6 +387,59 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
               )}
             </tbody>
           </table>
+
+          {/* Pagination & Status Footer */}
+          <div className="table-pagination-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>
+                Hiển thị <strong>{displayedRules.length}</strong> / <strong>{totalItems}</strong> quy tắc
+                {pageSize === 'ALL' ? ' (toàn bộ trên 1 trang)' : ` (Trang ${validCurrentPage}/${totalPages})`}
+              </span>
+              <span style={{ color: 'var(--text-secondary)' }}>•</span>
+              <span style={{ color: 'var(--success-strong)', fontSize: '11.5px', fontWeight: 500 }}>
+                ✓ Vừa vặn 1 trang, không cuộn ngang
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Hiển thị:</label>
+              <select 
+                className="select-input"
+                style={{ padding: '3px 8px', fontSize: '12px', height: 'auto' }}
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="ALL">Tất cả (1 trang duy nhất)</option>
+                <option value={5}>5 quy tắc / trang</option>
+                <option value={10}>10 quy tắc / trang</option>
+                <option value={20}>20 quy tắc / trang</option>
+              </select>
+
+              {pageSize !== 'ALL' && totalPages > 1 && (
+                <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                  <button
+                    type="button"
+                    className="table-pagination-btn"
+                    disabled={validCurrentPage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  >
+                    Trước
+                  </button>
+                  <button
+                    type="button"
+                    className="table-pagination-btn"
+                    disabled={validCurrentPage >= totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  >
+                    Sau
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
