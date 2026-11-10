@@ -55,7 +55,7 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
 
   useEffect(() => {
     loadRules();
-    loadThingSpeakStatus();
+    loadWorkerStatus();
   }, []);
 
   useEffect(() => {
@@ -74,21 +74,21 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
     }
   };
 
-  const loadThingSpeakStatus = async () => {
+  const loadWorkerStatus = async () => {
     try {
-      const status = await apiService.getThingSpeakStatus();
+      const status = await apiService.getBridgeStatus();
       setTsStatus(status);
     } catch {
       // ignore
     }
   };
 
-  const handleSyncThingSpeak = async () => {
+  const handleSyncBridge = async () => {
     setIsSyncing(true);
     try {
-      const res = await apiService.syncThingSpeak();
-      showToast(`Đã đồng bộ ${res.new_readings_count || 0} bản ghi từ ThingSpeak!`, 'success');
-      loadThingSpeakStatus();
+      const res = await apiService.syncBridge();
+      showToast(`Đã đồng bộ ${res.new_readings_count || 0} bản ghi từ Sensor Data Bridge!`, 'success');
+      loadWorkerStatus();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -199,28 +199,29 @@ export default function AdminConsole({ user, onOpenAuthModal, showToast }) {
           </div>
         </div>
 
-        {/* KPI 2: ThingSpeak Control Center */}
+        {/* KPI 2: Sensor Data Bridge Worker Control Center */}
         <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>THINGSPEAK WORKER</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>SENSOR DATA BRIDGE WORKER</span>
               <span className={`badge ${tsStatus?.is_running ? 'badge-normal' : 'badge-empty'}`}>
                 {tsStatus?.is_running ? '● Đang chạy' : '○ Tạm dừng'}
               </span>
             </div>
             <div style={{ fontSize: '13px', color: 'var(--brand-navy)', marginTop: '6px' }}>
-              Channel ID: <strong>{tsStatus?.channel_id || 3543608}</strong> · Quét mỗi 20s
+              Kênh: <strong>Kênh {tsStatus?.channel_id || 1}</strong> · Quét bộ nhớ đệm mỗi 20s
             </div>
           </div>
           <div style={{ marginTop: '12px' }}>
             <button 
               className="btn btn-secondary btn-sm" 
-              onClick={handleSyncThingSpeak}
+              onClick={handleSyncBridge}
               disabled={isSyncing}
               style={{ width: '100%' }}
+              title="Ép Backend đồng bộ các bản ghi mới từ Sensor Data Bridge (POST /api/v1/sync/bridge)"
             >
               <Radio size={14} />
-              <span>{isSyncing ? 'Đang kích hoạt...' : 'Ép đồng bộ ThingSpeak ngay'}</span>
+              <span>{isSyncing ? 'Đang kích hoạt...' : 'Ép đồng bộ Sensor Bridge ngay'}</span>
             </button>
           </div>
         </div>
