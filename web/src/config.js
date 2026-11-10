@@ -1,9 +1,22 @@
 /**
  * Pepper Nursery IoT - Web Dashboard Configuration
  * Phụ trách: DKhoa (05_DKhoa_Web_Dashboard.md)
+ * Tuân thủ: docs/contracts/huong-dan-tich-hop-frontend-mobile.md
  */
 
-export const BACKEND_URL = 'https://pepper-nursery-iot.onrender.com';
+// 1. Địa chỉ máy chủ Backend (Section 1)
+export const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL)
+  ? import.meta.env.VITE_BACKEND_URL.replace(/\/api\/v1\/?$/, '')
+  : 'https://pepper-nursery-iot.onrender.com';
+
+export const API_BASE_URL = `${BACKEND_URL}/api/v1`;
+
+// 2. Cổng dự phòng trực tiếp Sensor Data Bridge (Section 7)
+export const SENSOR_BRIDGE_CONFIG = {
+  baseUrl: 'https://sensor-data-bridge-backend.onrender.com/api/v1',
+  channelId: 1,
+  readApiKey: 'sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw'
+};
 
 export const APP_CONFIG = {
   // Chế độ dữ liệu mặc định: 'REAL_API' kết nối Backend Cloud của dự án
@@ -36,7 +49,7 @@ export const APP_CONFIG = {
   ],
 
   // Base URL của Backend chính thức
-  apiBaseUrl: BACKEND_URL,
+  apiBaseUrl: API_BASE_URL,
 
   // Chu kỳ tự động làm mới số đo (3 giây)
   autoRefreshIntervalMs: 3000,

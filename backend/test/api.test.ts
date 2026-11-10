@@ -83,6 +83,25 @@ async function runTests() {
       console.log('✓ GET history readings with limit passed');
     }
 
+    // 5b. Test GET /api/v1/devices/esp32-nursery-01/readings/range (Date range filtering)
+    {
+      const res = await request(
+        '/api/v1/devices/esp32-nursery-01/readings/range?start_date=2026-01-01&end_date=2026-12-31'
+      );
+      console.assert(res.status === 200, `Range expected 200, got ${res.status}`);
+      console.assert(res.body.device_id === 'esp32-nursery-01', 'device_id match');
+      console.assert(Array.isArray(res.body.readings), 'readings should be array');
+      console.assert(res.body.total >= 0, 'total should be non-negative');
+      console.log('✓ GET range readings with start_date & end_date passed');
+    }
+
+    // 5c. Test GET /api/v1/devices/esp32-nursery-01/readings/range missing params -> 422
+    {
+      const res = await request('/api/v1/devices/esp32-nursery-01/readings/range');
+      console.assert(res.status === 422, `Missing range params expected 422, got ${res.status}`);
+      console.log('✓ GET range readings without dates returns 422 passed');
+    }
+
     // 6. Test POST /api/v1/readings (New reading -> 201 Created)
     const testSampleId = `sample-test-${Date.now()}`;
     const newPayload = {
@@ -217,7 +236,103 @@ async function runTests() {
       });
       console.assert(res.status === 200, `Auth me expected 200, got ${res.status}`);
       console.assert(res.body.user.username === 'admin', 'username should be admin');
+      console.assert(res.body.user.selected_device_id !== undefined, 'selected_device_id should exist');
       console.log('✓ GET /auth/me passed');
+    }
+
+    // 14b. Test Devices API: GET /api/v1/devices
+    {
+      const res = await request('/api/v1/devices');
+      console.assert(res.status === 200, `List devices expected 200, got ${res.status}`);
+      console.assert(Array.isArray(res.body.devices), 'devices should be array');
+      console.assert(res.body.devices.length >= 2, 'should have at least 2 devices');
+      console.log('✓ GET /devices (list all devices) passed');
+    }
+
+    // 14c. Test Device Detail: GET /api/v1/devices/1 (lookup by ID from API read)
+    {
+      const res = await request('/api/v1/devices/1');
+      console.assert(res.status === 200, `Device 1 detail expected 200, got ${res.status}`);
+      console.assert(res.body.device.device_id === '1', 'device_id should be 1');
+      console.log('✓ GET /devices/1 (detail by API read ID) passed');
+    }
+
+    // 14d. Test User Select Device: PUT /api/v1/auth/me/device
+    {
+      const res = await request('/api/v1/auth/me/device', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: { device_id: '1' },
+      });
+      console.assert(res.status === 200, `Select device expected 200, got ${res.status}`);
+      console.assert(res.body.user.selected_device_id === '1', 'selected_device_id should be 1');
+      console.log('✓ PUT /auth/me/device (select device for user) passed');
+    }
+
+    // 14e. Test Reading for user device: GET /api/v1/devices/me/readings/latest
+    {
+      const res = await request('/api/v1/devices/me/readings/latest', {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      console.assert(res.status === 200, `Me reading expected 200, got ${res.status}`);
+      console.log('✓ GET /devices/me/readings/latest passed');
+    }
+
+    // 14f. Test Claim Device: POST /api/v1/user/devices
+    {
+      const res = await request('/api/v1/user/devices', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: { device_id: '1', custom_name: 'Vườn ươm ớt Khay A' },
+      });
+      console.assert(res.status === 201, `Claim device expected 201, got ${res.status}`);
+      console.assert(res.body.device.name === 'Vườn ươm ớt Khay A', 'custom name should match');
+      console.log('✓ POST /user/devices (claim device for account) passed');
+    }
+
+    // 14g. Test Get User Devices: GET /api/v1/user/devices
+    {
+      const res = await request('/api/v1/user/devices', {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      console.assert(res.status === 200, `Get user devices expected 200, got ${res.status}`);
+      console.assert(res.body.total >= 1, 'should have at least 1 device');
+      console.assert(res.body.devices[0].device_id === '1', 'device_id should match');
+      console.log('✓ GET /user/devices (list user devices) passed');
+    }
+
+    // 14h. Test Rename Device: PATCH /api/v1/user/devices/1
+    {
+      const res = await request('/api/v1/user/devices/1', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${userToken}` },
+        body: { name: 'Vườn ươm ớt Siêu Cay Khay 1' },
+      });
+      console.assert(res.status === 200, `Rename device expected 200, got ${res.status}`);
+      console.assert(res.body.device.name === 'Vườn ươm ớt Siêu Cay Khay 1', 'name updated');
+      console.log('✓ PATCH /user/devices/:id (rename display name) passed');
+    }
+
+    // 14i. Test Claim Conflict: Admin cannot claim device '1' while owned by user
+    {
+      const res = await request('/api/v1/user/devices', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: { device_id: '1' },
+      });
+      console.assert(res.status === 409, `Expected 409 Conflict, got ${res.status}`);
+      console.assert(res.body.error.code === 'device_already_claimed', 'expected device_already_claimed');
+      console.log('✓ POST /user/devices conflict (already claimed by another user) passed');
+    }
+
+    // 14j. Test Remove Device: DELETE /api/v1/user/devices/1
+    {
+      const res = await request('/api/v1/user/devices/1', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      console.assert(res.status === 200, `Remove device expected 200, got ${res.status}`);
+      console.log('✓ DELETE /user/devices/:id (remove device from account) passed');
     }
 
     // 15. Test Rules: GET /api/v1/rules
