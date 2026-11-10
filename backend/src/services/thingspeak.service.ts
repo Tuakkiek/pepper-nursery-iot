@@ -1,18 +1,19 @@
 import { config } from '../config';
-import { IngestReadingDto, SensorStatusEnum } from '../schemas/reading.schema';
+import { IngestReadingDto } from '../schemas/reading.schema';
 import { readingService } from './reading.service';
+import { sensorBridgeService } from './sensor-bridge.service';
 
 interface ThingSpeakFeed {
   created_at: string;
   entry_id: number;
-  field1: string | null; // Air Temperature (°C)
-  field2: string | null; // Air Humidity (%)
-  field3: string | null; // Soil Temperature (°C)
-  field4: string | null; // Soil Moisture (%)
-  field5: string | null; // Soil pH
-  field6: string | null; // TDS (ppm)
-  field7: string | null; // Soil ADC (raw)
-  field8: string | null; // pH ADC (raw)
+  field1: string | null;
+  field2: string | null;
+  field3: string | null;
+  field4: string | null;
+  field5: string | null;
+  field6: string | null;
+  field7: string | null;
+  field8: string | null;
 }
 
 interface ThingSpeakResponse {
@@ -45,12 +46,27 @@ export class ThingSpeakService {
   private lastError: string | null = null;
 
   getStatus() {
+    if (config.telemetryProvider === 'sensor_bridge') {
+      const sbStatus = sensorBridgeService.getStatus();
+      return {
+        ...sbStatus,
+        // compatibility aliases
+        channelId: String(sbStatus.channelId),
+        channel_id: sbStatus.channelId,
+        isPolling: sbStatus.isPolling,
+        is_running: sbStatus.isPolling,
+      };
+    }
+
     return {
+      provider: 'thingspeak',
       enabled: config.thingspeak.enabled,
       channelId: config.thingspeak.channelId,
+      channel_id: config.thingspeak.channelId,
       deviceId: config.thingspeak.deviceId,
       pollIntervalMs: config.thingspeak.pollIntervalMs,
       isPolling: this.timer !== null,
+      is_running: this.timer !== null,
       isSyncing: this.isSyncing,
       lastSyncAt: this.lastSyncAt,
       lastEntryId: this.lastEntryId,
@@ -69,7 +85,6 @@ export class ThingSpeakService {
     const soilAdc = parseIntNum(feed.field7);
     const phAdc = parseIntNum(feed.field8);
 
-    // Form ISO timestamp from created_at
     let recordedAt: string | null = null;
     if (feed.created_at) {
       try {
@@ -103,9 +118,13 @@ export class ThingSpeakService {
     };
   }
 
-  async syncLatestFeeds(results = 10): Promise<{ fetched: number; created: number; duplicates: number }> {
+  async syncLatestFeeds(results = 10): Promise<{ fetched: number; created: number; duplicates: number; new_readings_count?: number }> {
+    if (config.telemetryProvider === 'sensor_bridge') {
+      return sensorBridgeService.syncLatestFeeds(results);
+    }
+
     if (this.isSyncing) {
-      return { fetched: 0, created: 0, duplicates: 0 };
+      return { fetched: 0, created: 0, duplicates: 0, new_readings_count: 0 };
     }
 
     this.isSyncing = true;
@@ -140,7 +159,7 @@ export class ThingSpeakService {
       this.lastSyncAt = new Date().toISOString();
       this.lastError = null;
 
-      return { fetched: feeds.length, created, duplicates };
+      return { fetched: feeds.length, created, duplicates, new_readings_count: created };
     } catch (err: any) {
       this.lastError = err.message;
       throw err;
@@ -150,6 +169,11 @@ export class ThingSpeakService {
   }
 
   startPolling(): void {
+    if (config.telemetryProvider === 'sensor_bridge') {
+      sensorBridgeService.startPolling();
+      return;
+    }
+
     if (!config.thingspeak.enabled) {
       console.log('ThingSpeak sync is disabled in config.');
       return;
@@ -159,7 +183,6 @@ export class ThingSpeakService {
       `Starting ThingSpeak polling worker (Channel: ${config.thingspeak.channelId}, Interval: ${config.thingspeak.pollIntervalMs}ms)...`
     );
 
-    // Initial run immediately
     this.syncLatestFeeds()
       .then((res) => {
         if (res.created > 0) {
@@ -183,6 +206,11 @@ export class ThingSpeakService {
   }
 
   stopPolling(): void {
+    if (config.telemetryProvider === 'sensor_bridge') {
+      sensorBridgeService.stopPolling();
+      return;
+    }
+
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;

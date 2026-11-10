@@ -99,28 +99,80 @@ class ReadingData {
   }
 }
 
+class CareAdvice {
+  final String version;
+  final String status; // 'optimal' | 'warning' | 'danger' | 'insufficient_data'
+  final int? priority;
+  final String? code;
+  final String message;
+  final String? suggestedAction;
+
+  const CareAdvice({
+    this.version = '0.1',
+    required this.status,
+    this.priority,
+    this.code,
+    required this.message,
+    this.suggestedAction,
+  });
+
+  factory CareAdvice.fromJson(dynamic json) {
+    if (json == null) {
+      return const CareAdvice(
+        status: 'optimal',
+        message: 'Môi trường vườn ươm ớt con đang ở điều kiện sinh trưởng lý tưởng.',
+      );
+    }
+    if (json is String) {
+      return CareAdvice(
+        status: 'optimal',
+        message: json,
+      );
+    }
+    if (json is Map<String, dynamic>) {
+      return CareAdvice(
+        version: json['version'] as String? ?? '0.1',
+        status: json['status'] as String? ?? 'optimal',
+        priority: (json['priority'] as num?)?.toInt(),
+        code: json['code'] as String?,
+        message: json['message'] as String? ?? '',
+        suggestedAction: json['suggested_action'] as String?,
+      );
+    }
+    return const CareAdvice(
+      status: 'optimal',
+      message: 'Môi trường vườn ươm ớt con đang ở điều kiện sinh trưởng lý tưởng.',
+    );
+  }
+
+  bool get isDanger => status == 'danger';
+  bool get isWarning => status == 'warning';
+  bool get isOptimal => status == 'optimal';
+  bool get isInsufficientData => status == 'insufficient_data';
+}
+
 class LatestReadingResponse {
   final String deviceId;
   final ReadingData? reading;
   final DateTime? receivedAt;
   final bool? isStale;
-  final String? adviceMessage;
+  final CareAdvice? advice;
 
   const LatestReadingResponse({
     required this.deviceId,
     this.reading,
     this.receivedAt,
     this.isStale,
-    this.adviceMessage,
+    this.advice,
   });
 
+  String? get adviceMessage => advice?.message;
+
   factory LatestReadingResponse.fromJson(Map<String, dynamic> json) {
-    String? message;
+    CareAdvice? adviceObj;
     final adviceVal = json['advice'];
-    if (adviceVal is String) {
-      message = adviceVal;
-    } else if (adviceVal is Map<String, dynamic>) {
-      message = adviceVal['message'] as String?;
+    if (adviceVal != null) {
+      adviceObj = CareAdvice.fromJson(adviceVal);
     }
 
     return LatestReadingResponse(
@@ -132,7 +184,7 @@ class LatestReadingResponse {
           ? DateTime.tryParse(json['received_at'] as String)
           : null,
       isStale: json['is_stale'] as bool?,
-      adviceMessage: message,
+      advice: adviceObj,
     );
   }
 }

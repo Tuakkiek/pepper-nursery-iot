@@ -1,6 +1,7 @@
-# Web Dashboard — Vườn Ươm Ớt Con IoT
+# Web Dashboard — Vườn Ươm Ớt Con IoT (React + Vite)
 
 **Người phụ trách:** DKhoa  
+**Công nghệ:** React 19 + Vite + Lucide Icons  
 **Phạm vi hoàn thành:** Phase 1 (Giao diện dữ liệu giả), Phase 2 (Lớp API Adapter) & Phase 3 (Tích hợp Backend TDat & ThingSpeak)  
 **Phối hợp:** TDat (Backend & API), QThang (Mobile), MThuy (Agronomy), TKiet (Tích hợp)  
 **Hệ thống thiết kế:** Tuân thủ 100% `Design_System_Web_Mobile.md`  
@@ -8,9 +9,9 @@
 
 ---
 
-## 1. Giới thiệu & Phạm vi
+## 1. Giới thiệu & Điểm mới của Bản Nâng Cấp React + Vite
 
-Dashboard cung cấp giao diện trực quan theo dõi toàn diện 5 cảm biến trong vườn ươm ớt con:
+Dashboard cung cấp giao diện trực quan, hiện đại, theo dõi toàn diện 5 cảm biến trong vườn ươm ớt con:
 1. **Nhiệt độ không khí** (°C từ DHT22)
 2. **Độ ẩm không khí** (% từ DHT22)
 3. **Nhiệt độ đất** (°C từ DS18B20 vùng rễ ớt con)
@@ -19,8 +20,14 @@ Dashboard cung cấp giao diện trực quan theo dõi toàn diện 5 cảm bi�
    - **TDS** (ppm từ TDS Meter V1.0 sau hiệu chuẩn; hoặc số đọc ADC thô)
    - **pH** (pH từ PH-4502C qua bộ chia áp sau hiệu chuẩn; hoặc số đọc ADC thô)
 
-> [!NOTE]
-> TDS và pH là phép đo mẫu nước/dung dịch tưới, không phải TDS/pH của đất.
+### Các cải tiến giao diện hợp lý hơn:
+- **Kiến trúc SPA hiện đại (Single Page Application)**: Điều hướng tức thời giữa 3 tab chính:
+  1. 📊 **Giám sát vườn ươm (Live Monitor)**: Số đo thời gian thực, hero status, banner lời khuyên sinh học, biểu đồ SVG kép 2 panel riêng biệt (°C và %) và bảng dữ liệu lịch sử.
+  2. ⚙️ **Quản trị quy tắc Admin (Admin Console)**: Bảng CRUD toàn diện các quy tắc chăm sóc (`/api/v1/rules`), tìm kiếm, bộ lọc thông số, bật/tắt nhanh `is_active`, giám sát ThingSpeak Worker và nút ép đồng bộ.
+  3. 🧪 **Kiểm thử G0 Sandbox (Contract Playground)**: Cho phép chuyển đổi 1-click giữa 8 kịch bản biên G0 v0.1 (`normal`, `uncalibrated`, `partial_error`, `stale`, `empty`, `zero_valid`, `with_advice`, `server_error`) để đối soát hợp đồng ngay lập tức.
+- **Hệ thống Design System chuẩn mực**: Tôn trọng bảng 4 màu gốc `#F7444E`, `#F7F8F3`, `#78BCC4`, `#002C3E`, hiển thị số đo dạng `tabular-nums`, không nối đường biểu đồ qua điểm `null`.
+- **Hệ thống Xác thực (Auth Modal)**: Hỗ trợ đăng nhập/đăng ký với các nút nạp nhanh tài khoản kiểm thử (`admin` / `user`).
+- **Thông báo Toast**: Hiển thị trạng thái đồng bộ, thông báo lỗi/thành công mượt mà, không gây gián đoạn trải nghiệm người dùng.
 
 ---
 
@@ -28,133 +35,120 @@ Dashboard cung cấp giao diện trực quan theo dõi toàn diện 5 cảm bi�
 
 ```text
 web/
-├── .env                         # Cấu hình môi trường (Port, API_BASE_URL, DATA_MODE)
-├── index.html                   # Giao diện chính Dashboard theo dõi vườn ươm
-├── login.html                   # Giao diện Đăng nhập & Đăng ký người dùng
-├── admin.html                   # Cổng Quản trị Hệ thống dành cho Role Admin
-├── server.js                    # Web server Node.js thuần & Reverse Proxy sang Backend
-├── package.json                 # Lệnh npm start, npm test, npm run test:integration
+├── index.html                   # HTML template của Vite (nạp Inter font & JetBrains Mono)
+├── vite.config.js               # Cấu hình Vite dev server (port 3000, proxy /api)
+├── package.json                 # Lệnh scripts: dev, build, test, test:integration
 ├── README.md                    # Tài liệu hướng dẫn sử dụng và bàn giao
-├── css/
-│   ├── design-system.css        # Khai báo chuẩn tokens CSS theo Design System (Palette 4 màu gốc)
-│   ├── dashboard.css            # Bố cục lưới, thẻ MetricCard, biểu đồ và trạng thái
-│   ├── auth.css                 # Giao diện Đăng nhập & Đăng ký chuẩn Design System
-│   └── admin.css                # Giao diện Cổng Quản trị Admin, bảng quy tắc, modal
-├── js/
-│   ├── app.js                   # Application Controller điều phối UI, sự kiện và làm mới
-│   ├── auth.js                  # Dịch vụ Quản lý Xác thực & Phân quyền (JWT Token & Session)
-│   ├── admin.js                 # Quản trị viên: CRUD Care Rules, ThingSpeak sync, bộ lọc
-│   ├── config.js                # Cấu hình ứng dụng & tải động từ server
-│   ├── api/
-│   │   └── api-adapter.js       # Lớp Adapter: Chuyển đổi giữa Fixture và API thật (kèm ThingSpeak sync)
-│   ├── components/
-│   │   ├── metric-card.js       # Thẻ số đo (xử lý chuẩn 0 != null, raw ADC, lỗi)
-│   │   ├── device-status.js     # Tiêu đề thiết bị, phân biệt recorded_at vs received_at
-│   │   ├── care-advice.js       # Banner lời khuyên chăm sóc (chỉ hiện theo Backend)
-│   │   └── history-view.js      # Biểu đồ SVG kép (tách trục °C và %) và Bảng số đo
-│   └── fixtures/
-│       └── g0-fixtures.js       # Toàn bộ dữ liệu mô phỏng từ docs/contracts/fixtures/
+├── src/
+│   ├── main.jsx                 # Entry point khởi tạo React root
+│   ├── App.jsx                  # Điều phối toàn bộ State, Navigation & Layout
+│   ├── config.js                # Cấu hình trạm, kịch bản, múi giờ GMT+7, URL backend
+│   ├── styles/
+│   │   ├── design-system.css    # Khai báo tokens CSS (Màu gốc, Bo góc, Bóng đổ, Tương phản)
+│   │   └── app.css              # Bố cục giao diện, thẻ MetricCard, modal, tables, toast
+│   ├── services/
+│   │   ├── api.js               # ApiService: Chuyển đổi giữa REAL_API và FIXTURE Mock G0
+│   │   └── auth.js              # AuthService: Quản lý JWT Token, phân quyền admin/user
+│   ├── fixtures/
+│   │   └── g0-fixtures.js       # Toàn bộ 8 kịch bản mô phỏng từ docs/contracts/fixtures/
+│   └── components/
+│       ├── Navbar.jsx           # Header bar, chọn trạm, switch Cloud/Mock, profile
+│       ├── DeviceStatusHero.jsx # Thông tin trạm, phân biệt recorded_at vs received_at
+│       ├── CareAdviceBanner.jsx # Lời khuyên chăm sóc sinh học (chỉ hiển thị theo Backend)
+│       ├── MetricCard.jsx       # Thẻ số đo (xử lý chuẩn 0 != null, raw ADC thô, lỗi)
+│       ├── MetricGrid.jsx       # Lưới 6 thẻ cảm biến thời gian thực
+│       ├── HistorySection.jsx   # Biểu đồ SVG kép (Stacked 2 panels) và Bảng lịch sử
+│       ├── AdminConsole.jsx     # Cổng quản trị: CRUD quy tắc chăm sóc, ThingSpeak sync
+│       ├── ContractPlayground.jsx # Phòng thử nghiệm đối soát 8 kịch bản G0
+│       ├── AuthModal.jsx        # Hộp thoại Đăng nhập / Đăng ký kèm nút nạp nhanh
+│       ├── RuleModal.jsx        # Hộp thoại Thêm / Chỉnh sửa quy tắc sinh học
+│       └── Toast.jsx            # Thông báo nổi (Toast alerts)
 └── test/
-    ├── fixture-test.js          # Kiểm thử tự động 7 quy tắc hợp đồng G0 v0.1
-    └── integration-test.js      # Kiểm thử tích hợp 14 ca: API số đo, Auth và Admin Care Rules
+    ├── fixture-test.js          # Kiểm thử tự động 7 quy tắc hợp đồng G0 v0.1 (ESM)
+    └── integration-test.js      # Kiểm thử tích hợp 14 ca: API số đo, Auth và Admin Rules (ESM)
 ```
 
 ---
 
-## 3. Cách khởi chạy
+## 3. Cách khởi chạy và xây dựng (Development & Build)
 
-### Chạy Web Dashboard
-Dự án sử dụng Node.js thuần, **không cần cài đặt thêm bất kỳ thư viện ngoài nào**:
-
+### 3.1. Cài đặt thư viện
 ```bash
 cd web
-npm start
+npm install
 ```
-Mở trình duyệt truy cập: **`http://localhost:3000`** (Dashboard tự động kết nối Backend tại `https://pepper-nursery-iot.onrender.com`)
+
+### 3.2. Chạy môi trường Phát triển (Vite Dev Server)
+```bash
+npm run dev
+# hoặc: npm start
+```
+Mở trình duyệt truy cập: **`http://localhost:3000`**
+
+### 3.3. Đóng gói sản phẩm (Production Build)
+```bash
+npm run build
+```
+Mã nguồn tối ưu sẽ được xuất ra thư mục `web/dist/` (tốc độ biên dịch cực nhanh ~400ms).
+
+### 3.4. Triển khai lên Cloud Render (Deploy to Render)
+
+#### Cách 1: Render Static Site (Khuyên dùng - Nhanh & Miễn phí)
+1. Trên Render Dashboard, chọn **New +** $\rightarrow$ **Static Site**.
+2. Kết nối repo và điền các trường cấu hình:
+   - **Root Directory:** `web`
+   - **Build Command:** `npm run build`
+   - **Publish Directory:** `dist` *(LƯU Ý: Phải là `dist`, KHÔNG được để `web` hay để trống!)*
+3. Vào mục **Redirects/Rewrites** thêm 1 dòng:
+   - **Source:** `/*`
+   - **Destination:** `/index.html`
+   - **Action:** `Rewrite`
+4. Bấm **Create Static Site**.
+
+#### Cách 2: Render Web Service (Node.js Service)
+1. Trên Render Dashboard, chọn **New +** $\rightarrow$ **Web Service**.
+2. Điền cấu hình:
+   - **Root Directory:** `web`
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start` *(chạy `node prod-server.js` phục vụ thư mục `dist/` kèm MIME types chuẩn và tự động nhận diện `$PORT`)*.
 
 ---
 
-## 4. Tích hợp với Backend thật của TDat (Phase 2 & Phase 3)
+## 4. Kiểm thử tự động (Test Suites)
 
-### 4.1. Quy trình kết nối
-1. Backend của TDat được triển khai trên cloud: `https://pepper-nursery-iot.onrender.com`.
-2. Trên Web Dashboard:
-   - Mục **"Nguồn dữ liệu"**: Chọn **"🌐 API Thật (Backend Cloud: Render)"**.
-   - Mục **"Thiết bị"**: Chọn trạm cần theo dõi:
-     * `esp32-nursery-01`: Trạm vườn ươm chuẩn (đọc số đo hợp lệ mới nhất).
-     * `esp32-stale-01`: Trạm mô phỏng mất kết nối (kiểm thử cờ `is_stale: true`).
-     * `esp32-empty-01`: Trạm mới chưa gửi dữ liệu (kiểm thử trạng thái `reading: null`).
-     * `esp32-unknown`: Kiểm thử mã lỗi `404 device_not_found`.
-3. Hệ thống sẽ tự động gửi request đến:
-   - `GET /api/v1/devices/{device_id}/readings/latest`
-   - `GET /api/v1/devices/{device_id}/readings?limit=20`
-
-### 4.2. Tính năng Đồng bộ ThingSpeak (ThingSpeak Integration)
-Ngay trên thanh công cụ góc trên bên phải, nút **"📡 Đồng bộ ThingSpeak"** cho phép kích hoạt Backend đồng bộ ngay lập tức các feed cảm biến mới nhất từ ThingSpeak Channel `3543608` vào CSDL và tự động cập nhật số đo mới lên giao diện web.
-
----
-
-## 5. Chuyển đổi sang Chế độ Dữ liệu mẫu (Fixtures Mock)
-
-Nếu Backend chưa khởi động, bạn có thể chuyển nguồn dữ liệu sang **"📦 Dữ liệu mẫu (Fixtures G0 Mock)"** bất kỳ lúc nào để demo hoặc kiểm thử 8 kịch bản:
-- `latest-normal.json`: Đọc bình thường đủ 5 cảm biến.
-- `latest-uncalibrated.json`: Số đọc thô ADC, không gắn nhãn %, ppm, pH.
-- `latest-partial-error.json`: Một cảm biến lỗi không ảnh hưởng các cảm biến khác.
-- `latest-stale.json`: Dữ liệu cũ > 5 phút.
-- `latest-empty.json`: Hộp thông báo rỗng, không vẽ số 0 giả.
-- `zero_valid`: Kiểm thử `0 != null`.
-- `with_advice`: Hiển thị khuyến nghị chăm sóc theo Backend.
-- `server-error.json`: Thông báo lỗi máy chủ kèm nút thử lại.
-
----
-
-## 6. Kiểm thử tự động (Test Suites)
-
-### Kiểm thử Schema & Quy tắc hiển thị (Phase 1):
+### 4.1. Kiểm thử Schema & Quy tắc hiển thị (Phase 1):
 ```bash
 npm test
 ```
 *(7/7 ca kiểm tra hợp đồng G0 v0.1 thành công).*
 
-### Kiểm thử Tích hợp Web <-> Backend (Phase 3 & 5):
-Khi backend đang chạy:
+### 4.2. Kiểm thử Tích hợp Web <-> Backend Cloud Render (Phase 3 & 5):
 ```bash
 npm run test:integration
 ```
-Script kiểm tra thực tế toàn bộ 14 ca: Health check, số đo mới nhất, trạm mất kết nối, trạm rỗng, lỗi 404, lịch sử số đo, Đăng nhập Admin, Đăng nhập User, Xác thực phiên `/auth/me`, Danh sách quy tắc, Thêm quy tắc, Sửa quy tắc, Xóa quy tắc, và ThingSpeak Sync status.
+*(14/14 ca kiểm tra thực tế: Health check, số đo mới nhất, trạm mất kết nối, trạm rỗng, lỗi 404, lịch sử số đo, Đăng nhập Admin/User, Xác thực phiên `/auth/me`, CRUD Care Rules, và ThingSpeak Sync status).*
 
 ---
 
-## 7. Hướng dẫn sử dụng Hệ thống Xác thực (Auth) & Cổng Quản trị Admin
+## 5. Hướng dẫn sử dụng các Phân hệ
 
-### 7.1. Trang Đăng nhập & Đăng ký (`login.html`)
-* **Địa chỉ:** `http://localhost:3000/login.html` (hoặc nhấn nút **"🔑 Đăng nhập / Đăng ký"** tại Header trang chủ).
-* **Tài khoản thử nghiệm mặc định (nạp sẵn từ CSDL):**
-  - **Quản trị viên (Admin):** Username: `admin` | Password: `admin123`
-  - **Kỹ thuật viên (User):** Username: `user` | Password: `user123`
-* **Tính năng:**
-  - Chuyển tab nhanh giữa **Đăng nhập** và **Đăng ký tài khoản**.
-  - Nút **"Điền nhanh tài khoản thử nghiệm"** tiện lợi để trải nghiệm tức thì.
-  - Sau khi đăng nhập thành công:
-    - Nếu là role **`admin`**: Hệ thống tự động chuyển hướng đến **Trang Quản trị Admin (`admin.html`)**.
-    - Nếu là role **`user`**: Hệ thống chuyển về Dashboard theo dõi vườn ươm (`index.html`) kèm thông tin người dùng trên Header.
-  - Đăng ký tài khoản hỗ trợ phân quyền `user` hoặc `admin` theo `RegisterSchema`.
+### 5.1. Giám sát thời gian thực (Live Monitor)
+- **Nguồn dữ liệu:**
+  - `🌐 API Thật (Cloud Render)`: Tự động cập nhật số đo từ trạm `esp32-nursery-01` trên Backend Cloud (`https://pepper-nursery-iot.onrender.com`).
+  - `📦 Dữ liệu mẫu (G0 Mock)`: Thử nghiệm không cần mạng với 8 kịch bản hợp đồng.
+- **Nút "📡 Đồng bộ ThingSpeak":** Kích hoạt Backend lấy ngay các feed mới nhất từ ThingSpeak Channel `3543608`.
 
-### 7.2. Cổng Quản trị Hệ thống của Role Admin (`admin.html`)
-* **Địa chỉ:** `http://localhost:3000/admin.html`
-* **Cơ chế bảo vệ (Role Guard):**
-  - Chỉ người dùng có role **`admin`** và JWT token hợp lệ mới được truy cập.
-  - Người dùng chưa đăng nhập sẽ được chuyển hướng về trang `login.html`.
-  - Tài khoản role `user` sẽ bị từ chối truy cập và chuyển về `index.html`.
-* **Chức năng chính:**
-  1. **Thống kê tổng quan (KPIs):** Tổng số quy tắc, số quy tắc đang kích hoạt, trạng thái kết nối ThingSpeak Polling Worker, thời điểm lấy mẫu ngầm gần nhất.
-  2. **Quản lý Quy tắc Chăm sóc (Care Rules Management):**
-     - Hiển thị danh sách toàn bộ các quy tắc sinh học (ngưỡng nhiệt độ KK, độ ẩm KK, nhiệt độ đất, độ ẩm đất, pH nước, TDS dinh dưỡng).
-     - **Tìm kiếm & Lọc:** Tìm theo từ khóa, lọc theo loại thông số cảm biến, lọc theo mức độ (`danger`, `warning`, `info`) và lọc theo trạng thái kích hoạt.
-     - **Thêm quy tắc mới (`POST /api/v1/rules`):** Mở modal form chuẩn schema với kiểm tra dữ liệu đầu vào.
-     - **Chỉnh sửa quy tắc (`PUT /api/v1/rules/:id`):** Cập nhật ngưỡng giá trị, nội dung khuyến nghị hành động, mức độ cảnh báo.
-     - **Xóa quy tắc (`DELETE /api/v1/rules/:id`):** Hộp thoại xác nhận an toàn trước khi xóa khỏi CSDL.
-     - **Bật/Tắt nhanh trạng thái kích hoạt (`switch toggle`):** Cập nhật ngay lập tức `is_active` mà không cần reload trang.
-  3. **Đồng bộ ThingSpeak (ThingSpeak Control Center):**
-     - Giám sát thông số Channel ID `3543608`, trạm đích `esp32-nursery-01`, chu kỳ quét 20s.
-     - Kích hoạt đồng bộ tức thời (`POST /api/v1/sync/thingspeak`) ngay từ trang Admin.
+### 5.2. Cổng Quản trị Admin (Admin Console)
+- Nhấn tab **"Quản trị quy tắc Admin"**.
+- Nếu chưa đăng nhập: Nhấn **"🔑 Đăng nhập quyền Admin"** $\rightarrow$ Chọn nút nạp nhanh **`admin / admin123`** $\rightarrow$ Đăng nhập.
+- **Tính năng:**
+  - Tìm kiếm quy tắc theo mã, tên, nội dung.
+  - Lọc theo loại cảm biến (Nhiệt KK, Ẩm KK, Nhiệt đất, Ẩm đất, pH, TDS).
+  - Bật/tắt nhanh quy tắc (`is_active`) bằng 1 click.
+  - Thêm quy tắc mới hoặc Chỉnh sửa ngưỡng và câu chữ khuyến nghị hành động.
+  - Kích hoạt ép đồng bộ từ ThingSpeak.
+
+### 5.3. Phòng Thử Nghiệm G0 (Contract Sandbox)
+- Nhấn tab **"Kiểm thử G0 Sandbox"**.
+- Danh sách 8 kịch bản biên được trình bày trực quan kèm quy tắc hợp đồng tương ứng.
+- Nhấn **"Kích hoạt thử kịch bản này"** để đưa kịch bản đó lên màn hình Live Dashboard ngay lập tức.

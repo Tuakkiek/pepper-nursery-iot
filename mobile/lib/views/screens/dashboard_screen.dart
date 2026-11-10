@@ -144,6 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             DeviceStatusCard(
               latestData: _latestData,
               isFixtureMode: isFixture,
+              isBridgeMode: widget.apiService.mode == DataSourceMode.bridge,
               isBackendOnline: widget.apiService.isBackendOnline,
               autoRefreshEnabled: widget.apiService.autoRefresh,
               refreshIntervalSeconds: widget.apiService.refreshIntervalSeconds,

@@ -6,6 +6,7 @@ import '../../models/sensor_reading.dart';
 class DeviceStatusCard extends StatelessWidget {
   final LatestReadingResponse? latestData;
   final bool isFixtureMode;
+  final bool isBridgeMode;
   final bool isBackendOnline;
   final bool autoRefreshEnabled;
   final int refreshIntervalSeconds;
@@ -15,6 +16,7 @@ class DeviceStatusCard extends StatelessWidget {
     super.key,
     required this.latestData,
     required this.isFixtureMode,
+    this.isBridgeMode = false,
     this.isBackendOnline = false,
     this.autoRefreshEnabled = true,
     this.refreshIntervalSeconds = 3,
@@ -118,13 +120,17 @@ class DeviceStatusCard extends StatelessWidget {
                           child: Text(
                             isFixtureMode
                                 ? 'Dữ liệu mẫu'
-                                : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API'),
+                                : (isBridgeMode
+                                    ? '● Sensor Bridge'
+                                    : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API')),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: isFixtureMode
                                   ? AppColors.textSecondary
-                                  : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong),
+                                  : (isBridgeMode
+                                      ? const Color(0xFF856404)
+                                      : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong)),
                             ),
                           ),
                         ),

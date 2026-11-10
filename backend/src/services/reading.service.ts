@@ -60,6 +60,17 @@ export function formatUtcIso(d: Date | string | null): string | null {
 }
 
 export class ReadingService {
+  private fallbackLatestGetter: ((deviceId: string) => IngestReadingDto | null) | null = null;
+  private fallbackHistoryGetter: ((deviceId: string, limit: number) => HistoryItem[] | null) | null = null;
+
+  setFallbackGetters(
+    latest: (deviceId: string) => IngestReadingDto | null,
+    history: (deviceId: string, limit: number) => HistoryItem[] | null
+  ) {
+    this.fallbackLatestGetter = latest;
+    this.fallbackHistoryGetter = history;
+  }
+
   async ensureDevice(deviceId: string, name?: string): Promise<void> {
     await pool.query(
       `INSERT INTO devices (device_id, name)
@@ -158,6 +169,34 @@ export class ReadingService {
     );
 
     if (rows.length === 0) {
+      if (this.fallbackLatestGetter) {
+        const cached = this.fallbackLatestGetter(deviceId);
+        if (cached) {
+          let isStale: boolean | null = null;
+          if (cached.recorded_at) {
+            const recordedTime = new Date(cached.recorded_at).getTime();
+            const diffMinutes = (Date.now() - recordedTime) / (1000 * 60);
+            isStale = diffMinutes > config.staleThresholdMinutes;
+          }
+
+          let advice: AdviceResult | null = null;
+          if (ruleService.isEnabled()) {
+            advice = await careRuleService.evaluateActiveRules(cached, isStale);
+            if (!advice) {
+              advice = ruleService.evaluate(cached, isStale);
+            }
+          }
+
+          return {
+            device_id: deviceId,
+            reading: cached,
+            received_at: cached.recorded_at || new Date().toISOString(),
+            is_stale: isStale,
+            advice,
+          };
+        }
+      }
+
       return {
         device_id: deviceId,
         reading: null,
@@ -219,6 +258,17 @@ export class ReadingService {
        LIMIT ?`,
       [deviceId, limit]
     );
+
+    if (rows.length === 0 && this.fallbackHistoryGetter) {
+      const cachedItems = this.fallbackHistoryGetter(deviceId, limit);
+      if (cachedItems && cachedItems.length > 0) {
+        return {
+          device_id: deviceId,
+          limit,
+          readings: cachedItems,
+        };
+      }
+    }
 
     const items: HistoryItem[] = rows.map((r) => {
       const reading: IngestReadingDto = typeof r.raw_payload === 'string'

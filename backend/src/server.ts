@@ -3,6 +3,7 @@ import { config } from './config';
 import { checkDbConnection } from './db/connection';
 import { runMigrations } from './db/migrations';
 import { thingSpeakService } from './services/thingspeak.service';
+import { sensorBridgeService } from './services/sensor-bridge.service';
 
 async function startServer() {
   try {
@@ -20,13 +21,20 @@ async function startServer() {
       console.log(` Network URL: http://${config.host}:${config.port}`);
       console.log(` Contract:    v0.1 (/api/v1)`);
       console.log(` DB Host:     ${config.db.host}:${config.db.port}`);
-      if (config.thingspeak.enabled) {
-        console.log(` ThingSpeak:  Channel ${config.thingspeak.channelId} (Polling: ${config.thingspeak.pollIntervalMs}ms)`);
+      if (config.telemetryProvider === 'sensor_bridge') {
+        console.log(` Telemetry:   Sensor Data Bridge (Channel ${config.sensorBridge.channelId})`);
+        console.log(` Bridge URL:  ${config.sensorBridge.baseUrl}`);
+      } else if (config.thingspeak.enabled) {
+        console.log(` Telemetry:   ThingSpeak (Channel ${config.thingspeak.channelId})`);
       }
       console.log(`====================================================`);
 
-      // Start ThingSpeak sync worker
-      thingSpeakService.startPolling();
+      // Start Telemetry Ingestion Worker (Sensor Data Bridge / ThingSpeak)
+      if (config.telemetryProvider === 'sensor_bridge') {
+        sensorBridgeService.startPolling();
+      } else {
+        thingSpeakService.startPolling();
+      }
     });
   } catch (err) {
     console.error('Failed to start server:', err);
@@ -35,4 +43,3 @@ async function startServer() {
 }
 
 startServer();
-

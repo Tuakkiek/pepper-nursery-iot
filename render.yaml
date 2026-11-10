@@ -1,0 +1,15 @@
+services:
+  # Web Dashboard (React + Vite)
+  - type: web
+    name: pepper-nursery-web
+    runtime: node
+    plan: free
+    rootDir: web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 3000
+
