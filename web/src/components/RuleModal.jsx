@@ -15,7 +15,6 @@ export default function RuleModal({ isOpen, rule, initialRule, onClose, onSave }
   const [actionAdvice, setActionAdvice] = useState('');
   const [isActive, setIsActive] = useState(true);
 
-  // Sync state whenever modal opens or currentRule changes
   useEffect(() => {
     if (isOpen) {
       if (currentRule) {
@@ -23,8 +22,16 @@ export default function RuleModal({ isOpen, rule, initialRule, onClose, onSave }
         setName(currentRule.name || '');
         setParameter(currentRule.parameter || 'air_temperature_c');
         setOperator(currentRule.operator || '>');
-        setThresholdMin(currentRule.threshold_min !== undefined && currentRule.threshold_min !== null ? currentRule.threshold_min : 35);
-        setThresholdMax(currentRule.threshold_max !== undefined && currentRule.threshold_max !== null ? currentRule.threshold_max : '');
+        setThresholdMin(
+          currentRule.threshold_min !== undefined && currentRule.threshold_min !== null
+            ? currentRule.threshold_min
+            : ''
+        );
+        setThresholdMax(
+          currentRule.threshold_max !== undefined && currentRule.threshold_max !== null
+            ? currentRule.threshold_max
+            : ''
+        );
         setSeverity(currentRule.severity || 'warning');
         setActionAdvice(currentRule.action_advice || '');
         setIsActive(currentRule.is_active !== undefined ? currentRule.is_active : true);
@@ -42,32 +49,28 @@ export default function RuleModal({ isOpen, rule, initialRule, onClose, onSave }
     }
   }, [isOpen, currentRule]);
 
-  // Support closing with Escape key
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // If modal is not open, do not render anything
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave({
-      rule_code: ruleCode,
-      name,
+      rule_code: ruleCode.trim(),
+      name: name.trim(),
       parameter,
       operator,
       threshold_min: thresholdMin !== '' ? Number(thresholdMin) : null,
       threshold_max: thresholdMax !== '' ? Number(thresholdMax) : null,
       severity,
-      action_advice: actionAdvice,
+      action_advice: actionAdvice.trim(),
       is_active: isActive
     });
   };
@@ -76,158 +79,162 @@ export default function RuleModal({ isOpen, rule, initialRule, onClose, onSave }
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">
-            {isEdit ? `Chỉnh sửa Quy tắc #${currentRule.id}` : 'Thêm Quy tắc Chăm sóc Mới'}
-          </h3>
-          <button 
-            type="button" 
-            className="modal-close-btn" 
+          <div>
+            <h3 className="modal-title">
+              {isEdit ? `Chỉnh sửa quy tắc` : 'Thêm quy tắc mới'}
+            </h3>
+            {isEdit && (
+              <p className="modal-subtitle">
+                Mã: <code>{currentRule.rule_code}</code>
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="modal-close-btn"
             onClick={onClose}
             title="Đóng (Esc)"
             aria-label="Đóng"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div className="form-group">
-            <label className="form-label">Mã quy tắc (Rule Code)</label>
-            <input 
-              type="text"
-              required
-              disabled={isEdit}
-              className="form-input"
-              placeholder="VD: AIR_TEMP_HIGH_01"
-              value={ruleCode}
-              onChange={(e) => setRuleCode(e.target.value)}
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          <div className="modal-body">
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label">Mã quy tắc *</label>
+                <input
+                  type="text"
+                  required
+                  disabled={isEdit}
+                  className="form-input"
+                  placeholder="VD: AIR_TEMP_HIGH"
+                  value={ruleCode}
+                  onChange={(e) => setRuleCode(e.target.value)}
+                />
+              </div>
 
-          <div className="form-group">
-            <label className="form-label">Tên quy tắc</label>
-            <input 
-              type="text"
-              required
-              className="form-input"
-              placeholder="VD: Cảnh báo nhiệt độ không khí quá nóng"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-            <div className="form-group">
-              <label className="form-label">Thông số cảm biến</label>
-              <select 
-                className="select-input"
-                style={{ width: '100%' }}
-                value={parameter}
-                onChange={(e) => setParameter(e.target.value)}
-              >
-                <option value="air_temperature_c">Nhiệt độ không khí (°C)</option>
-                <option value="air_humidity_pct">Độ ẩm không khí (%)</option>
-                <option value="soil_temperature_c">Nhiệt độ đất (°C)</option>
-                <option value="soil_moisture_pct">Độ ẩm đất (%)</option>
-                <option value="water_ph">pH nước tưới</option>
-                <option value="water_tds_ppm">TDS dung dịch (ppm)</option>
-              </select>
+              <div className="form-group">
+                <label className="form-label">Mức độ cảnh báo</label>
+                <select
+                  className="form-select"
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value)}
+                >
+                  <option value="info">Thông tin (Info)</option>
+                  <option value="warning">Cảnh báo (Warning)</option>
+                  <option value="danger">Nguy hiểm (Danger)</option>
+                </select>
+              </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Toán tử so sánh</label>
-              <select 
-                className="select-input"
-                style={{ width: '100%' }}
-                value={operator}
-                onChange={(e) => setOperator(e.target.value)}
-              >
-                <option value=">">&gt; Lớn hơn</option>
-                <option value="<">&lt; Nhỏ hơn</option>
-                <option value=">=">&gt;= Lớn hơn hoặc bằng</option>
-                <option value="<=">&lt;= Nhỏ hơn hoặc bằng</option>
-                <option value="between">Trong khoảng (between)</option>
-                <option value="outside">Ngoài khoảng (outside)</option>
-              </select>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-            <div className="form-group">
-              <label className="form-label">Ngưỡng (Threshold Min)</label>
-              <input 
-                type="number"
-                step="0.1"
+              <label className="form-label">Tên quy tắc *</label>
+              <input
+                type="text"
                 required
                 className="form-input"
-                value={thresholdMin}
-                onChange={(e) => setThresholdMin(e.target.value)}
+                placeholder="VD: Cảnh báo nhiệt độ không khí quá nóng"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
             </div>
 
-            {(operator === 'between' || operator === 'outside') && (
+            <div className="form-grid-2">
               <div className="form-group">
-                <label className="form-label">Ngưỡng trên (Threshold Max)</label>
-                <input 
+                <label className="form-label">Thông số cảm biến</label>
+                <select
+                  className="form-select"
+                  value={parameter}
+                  onChange={(e) => setParameter(e.target.value)}
+                >
+                  <option value="air_temperature_c">Nhiệt độ không khí (°C)</option>
+                  <option value="air_humidity_pct">Độ ẩm không khí (%)</option>
+                  <option value="soil_temperature_c">Nhiệt độ đất (°C)</option>
+                  <option value="soil_moisture_pct">Độ ẩm đất (%)</option>
+                  <option value="water_ph">pH dung dịch</option>
+                  <option value="water_tds_ppm">TDS dung dịch (ppm)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Toán tử so sánh</label>
+                <select
+                  className="form-select"
+                  value={operator}
+                  onChange={(e) => setOperator(e.target.value)}
+                >
+                  <option value=">">&gt; Lớn hơn</option>
+                  <option value="<">&lt; Nhỏ hơn</option>
+                  <option value=">=">&gt;= Lớn hơn hoặc bằng</option>
+                  <option value="<=">&lt;= Nhỏ hơn hoặc bằng</option>
+                  <option value="between">Trong khoảng (between)</option>
+                  <option value="outside">Ngoài khoảng (outside)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label">
+                  {operator === 'between' || operator === 'outside' ? 'Ngưỡng dưới' : 'Giá trị ngưỡng'} *
+                </label>
+                <input
                   type="number"
                   step="0.1"
+                  required
                   className="form-input"
-                  value={thresholdMax}
-                  onChange={(e) => setThresholdMax(e.target.value)}
+                  value={thresholdMin}
+                  onChange={(e) => setThresholdMin(e.target.value)}
                 />
               </div>
-            )}
+
+              {(operator === 'between' || operator === 'outside') && (
+                <div className="form-group">
+                  <label className="form-label">Ngưỡng trên *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    className="form-input"
+                    value={thresholdMax}
+                    onChange={(e) => setThresholdMax(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
 
             <div className="form-group">
-              <label className="form-label">Mức độ nghiêm trọng</label>
-              <select 
-                className="select-input"
-                style={{ width: '100%' }}
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value)}
-              >
-                <option value="info">Thông tin (Info)</option>
-                <option value="warning">Cảnh báo (Warning)</option>
-                <option value="danger">Nguy hiểm (Danger)</option>
-              </select>
+              <label className="form-label">Khuyến nghị hành động *</label>
+              <textarea
+                required
+                rows={3}
+                className="form-input form-textarea"
+                placeholder="VD: Kéo lưới che nắng và bật phun sương làm mát mái."
+                value={actionAdvice}
+                onChange={(e) => setActionAdvice(e.target.value)}
+              />
             </div>
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">Nội dung khuyến nghị hành động (Action Advice)</label>
-            <textarea 
-              required
-              rows={3}
-              className="form-input"
-              placeholder="VD: Cần kéo bạt lưới che nắng và bật hệ thống phun sương làm mát"
-              value={actionAdvice}
-              onChange={(e) => setActionAdvice(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-            <input 
-              type="checkbox"
-              id="is_active_chk"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-            />
-            <label htmlFor="is_active_chk" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brand-navy)', cursor: 'pointer' }}>
-              Kích hoạt quy tắc này ngay lập tức
+            <label className="form-checkbox-row" htmlFor="is_active_chk">
+              <input
+                type="checkbox"
+                id="is_active_chk"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+              />
+              <span>Kích hoạt quy tắc này ngay lập tức</span>
             </label>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
-              onClick={onClose}
-            >
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
               Hủy
             </button>
             <button type="submit" className="btn btn-primary">
-              <Save size={14} />
+              <Save size={15} />
               <span>{isEdit ? 'Lưu thay đổi' : 'Tạo quy tắc'}</span>
             </button>
           </div>
