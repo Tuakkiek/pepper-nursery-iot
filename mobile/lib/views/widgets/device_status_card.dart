@@ -100,7 +100,7 @@ class DeviceStatusCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            deviceId,
+                            deviceId == '1' ? 'Trạm 1 (Vườn Ươm Ớt)' : deviceId,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,

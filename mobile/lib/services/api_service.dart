@@ -39,7 +39,7 @@ class ApiService extends ChangeNotifier {
   DataSourceMode _mode = DataSourceMode.live; // Mặc định kết nối backend thật TDat
   FixtureScenario _currentScenario = FixtureScenario.normal;
   late String _baseUrl;
-  String _deviceId = 'esp32-nursery-01';
+  String _deviceId = '1'; // Mặc định trạm 1 (Trạm vườn ươm ớt thực tế, phát trực tiếp realtime)
 
   // Auth state
   String? _token;
@@ -281,14 +281,46 @@ class ApiService extends ChangeNotifier {
       if (response.statusCode == 200) {
         _isBackendOnline = true;
         final data = jsonDecode(response.body);
-        return LatestReadingResponse.fromJson(data as Map<String, dynamic>);
+        var result = LatestReadingResponse.fromJson(data as Map<String, dynamic>);
+
+        // Tự động chuyển sang trạm 1 nếu trạm đang chọn bị stale (> 5 phút) và trạm 1 đang có dữ liệu mới
+        if ((result.isStale == true || result.reading == null) && _deviceId != '1') {
+          try {
+            final liveUri = Uri.parse('$_baseUrl/api/v1/devices/1/readings/latest');
+            final liveRes = await http
+                .get(liveUri, headers: _getHeaders())
+                .timeout(const Duration(seconds: 4));
+            if (liveRes.statusCode == 200) {
+              final liveData = jsonDecode(liveRes.body);
+              final liveResult = LatestReadingResponse.fromJson(liveData as Map<String, dynamic>);
+              if (liveResult.isStale == false && liveResult.reading != null) {
+                _deviceId = '1';
+                notifyListeners();
+                return liveResult;
+              }
+            }
+          } catch (_) {}
+        }
+
+        return result;
       } else if (response.statusCode == 404) {
         _isBackendOnline = true;
+        // Nếu thiết bị không tìm thấy, thử fallback sang trạm 1
+        if (_deviceId != '1') {
+          _deviceId = '1';
+          return await _fetchFromApi();
+        }
         throw Exception('Thiết bị không tồn tại ($_deviceId)');
       } else {
         throw Exception('Lỗi máy chủ: mã phản hồi ${response.statusCode}');
       }
     } catch (e) {
+      // Phương án dự phòng Mục 7: Tự động chuyển sang Sensor Data Bridge khi Backend timeout/lỗi kết nối
+      if (_deviceId == '1' || _deviceId == 'esp32-nursery-01') {
+        try {
+          return await _fetchFromSensorBridge();
+        } catch (_) {}
+      }
       _isBackendOnline = false;
       rethrow;
     }
@@ -394,11 +426,27 @@ class ApiService extends ChangeNotifier {
           _isBackendOnline = true;
           final data = jsonDecode(response.body);
           final historyResponse = HistoryResponse.fromJson(data as Map<String, dynamic>);
+          if (historyResponse.readings.isEmpty && _deviceId != '1') {
+            final fbUri = Uri.parse('$_baseUrl/api/v1/devices/1/readings?limit=$limit');
+            final fbRes = await http.get(fbUri, headers: _getHeaders()).timeout(const Duration(seconds: 4));
+            if (fbRes.statusCode == 200) {
+              final fbData = jsonDecode(fbRes.body);
+              final fbHist = HistoryResponse.fromJson(fbData as Map<String, dynamic>);
+              if (fbHist.readings.isNotEmpty) {
+                return fbHist.readings;
+              }
+            }
+          }
           return historyResponse.readings;
         } else {
           throw Exception('Không tải được lịch sử: ${response.statusCode}');
         }
       } catch (e) {
+        if (_deviceId == '1' || _deviceId == 'esp32-nursery-01') {
+          try {
+            return await _fetchHistoryFromSensorBridge(limit: limit);
+          } catch (_) {}
+        }
         _isBackendOnline = false;
         rethrow;
       }
