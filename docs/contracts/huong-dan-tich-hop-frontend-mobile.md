@@ -168,3 +168,4 @@ Trong trường hợp Backend TDat đang deploy lại hoặc bảo trì, Fronten
   - `field6`: TDS nước tưới (ppm)
   - `field7`: ADC thô độ ẩm đất
   - `field8`: ADC thô độ pH
+
