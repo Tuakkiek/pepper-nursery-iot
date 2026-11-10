@@ -59,6 +59,9 @@ export default function App() {
       // 1. Fetch Latest
       const latest = await apiService.getLatestReading(deviceId, dataMode, currentScenario);
       setLatestData(latest);
+      if (latest._is_fallback) {
+        showToast('Đang kết nối qua cổng dự phòng Sensor Data Bridge', 'info');
+      }
 
       // 2. Fetch History (Limit 20)
       const history = await apiService.getHistory(deviceId, 20, dataMode);
@@ -91,12 +94,12 @@ export default function App() {
     };
   }, [activeTab, dataMode, deviceId]);
 
-  // Sync ThingSpeak
+  // Sync Telemetry (Sensor Data Bridge / ThingSpeak - Section 4)
   const handleSyncThingSpeak = async () => {
     setIsLoading(true);
     try {
-      const res = await apiService.syncThingSpeak();
-      showToast(`Đã đồng bộ ThingSpeak thành công (${res.new_readings_count || 0} bản ghi mới)`, 'success');
+      const res = await apiService.syncBridge();
+      showToast(`Đã đồng bộ số đo thành công (${res.new_readings_count || 0} bản ghi mới)`, 'success');
       loadData(false);
     } catch (err) {
       showToast(err.message, 'error');

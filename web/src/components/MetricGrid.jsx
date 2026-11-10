@@ -100,10 +100,10 @@ export default function MetricGrid({ reading, isStale }) {
       name: 'pH mẫu nước / Dung dịch',
       sensorTag: 'PH-4502C',
       icon: <FlaskConical size={20} />,
-      status: sensorStatus.ph4502c || 'ok',
+      status: sensorStatus.ph4502c || sensorStatus.ph || 'ok',
       value: reading.water_ph,
       unit: 'pH',
-      isCalibrated: reading.water_ph !== null && sensorStatus.ph4502c === 'ok',
+      isCalibrated: reading.water_ph !== null && (sensorStatus.ph4502c === 'ok' || sensorStatus.ph === 'ok' || (!sensorStatus.ph4502c && !sensorStatus.ph)),
       rawFallback: reading.water_ph_adc_raw,
       notes: 'GPIO35 qua mạch chia áp'
     }

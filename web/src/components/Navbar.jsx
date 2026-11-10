@@ -46,14 +46,14 @@ export default function Navbar({
 
         {/* Actions & Profile */}
         <div className="header-actions">
-          {/* ThingSpeak Sync Trigger */}
+          {/* Telemetry / Bridge Sync Trigger */}
           <button 
             className="btn btn-secondary btn-sm"
             onClick={onSyncThingSpeak}
-            title="Kích hoạt Backend đồng bộ ngay từ ThingSpeak Channel 3543608"
+            title="Kích hoạt Backend đồng bộ tức thời từ Sensor Data Bridge (POST /api/v1/sync/bridge)"
           >
             <Radio size={14} className="text-teal" />
-            <span>Đồng bộ ThingSpeak</span>
+            <span>Đồng bộ Telemetry</span>
           </button>
 
           {/* Refresh Button */}

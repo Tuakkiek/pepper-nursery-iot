@@ -10,10 +10,12 @@ const USER_KEY = 'pepper_nursery_user_info';
 
 export const authService = {
   getToken() {
+    if (typeof localStorage === 'undefined') return null;
     return localStorage.getItem(TOKEN_KEY);
   },
 
   getUser() {
+    if (typeof localStorage === 'undefined') return null;
     try {
       const u = localStorage.getItem(USER_KEY);
       return u ? JSON.parse(u) : null;
@@ -32,13 +34,17 @@ export const authService = {
   },
 
   setSession(token, user) {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    }
   },
 
   clearSession() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
   },
 
   async login(username, password) {
