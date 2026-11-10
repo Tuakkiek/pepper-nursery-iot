@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +23,10 @@ enum FixtureScenario {
 }
 
 class ApiService extends ChangeNotifier {
+  static const String defaultCloudUrl = 'https://pepper-nursery-iot.onrender.com';
+  static const String defaultLocalUrl = 'http://localhost:8000';
+  static const String defaultAndroidEmulatorUrl = 'http://10.0.2.2:8000';
+
   DataSourceMode _mode = DataSourceMode.live; // Mặc định kết nối backend thật
   FixtureScenario _currentScenario = FixtureScenario.normal;
   late String _baseUrl;
@@ -36,20 +40,21 @@ class ApiService extends ChangeNotifier {
   bool _isBackendOnline = false;
   String? _lastHealthTimestamp;
 
+  // Auto-refresh state (cập nhật tự động mỗi 3s)
+  Timer? _autoRefreshTimer;
+  bool _autoRefresh = true;
+  int _refreshIntervalSeconds = 3;
+  bool _isAutoRefreshing = false;
+  LatestReadingResponse? _latestReading;
+  DateTime? _lastRefreshedAt;
+  String? _autoRefreshError;
+
   ApiService() {
     _baseUrl = _getDefaultBaseUrl();
   }
 
   static String _getDefaultBaseUrl() {
-    if (kIsWeb) {
-      return 'http://localhost:8000';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000';
-      }
-    } catch (_) {}
-    return 'http://localhost:8000';
+    return defaultCloudUrl;
   }
 
   DataSourceMode get mode => _mode;
@@ -61,6 +66,75 @@ class ApiService extends ChangeNotifier {
   bool get isAuthenticated => _token != null && _currentUser != null;
   bool get isBackendOnline => _isBackendOnline;
   String? get lastHealthTimestamp => _lastHealthTimestamp;
+
+  bool get autoRefresh => _autoRefresh;
+  int get refreshIntervalSeconds => _refreshIntervalSeconds;
+  bool get isAutoRefreshing => _isAutoRefreshing;
+  LatestReadingResponse? get latestReading => _latestReading;
+  DateTime? get lastRefreshedAt => _lastRefreshedAt;
+  String? get autoRefreshError => _autoRefreshError;
+
+  set autoRefresh(bool val) {
+    if (_autoRefresh != val) {
+      _autoRefresh = val;
+      if (_autoRefresh) {
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
+      notifyListeners();
+    }
+  }
+
+  set refreshIntervalSeconds(int val) {
+    if (_refreshIntervalSeconds != val && val >= 1) {
+      _refreshIntervalSeconds = val;
+      if (_autoRefresh) {
+        startAutoRefresh();
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Khởi động timer tự động làm mới số đo (mặc định mỗi 3 giây)
+  void startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    if (!_autoRefresh) return;
+    _autoRefreshTimer = Timer.periodic(
+      Duration(seconds: _refreshIntervalSeconds),
+      (_) => pollLatestReading(),
+    );
+  }
+
+  /// Tạm dừng timer tự động làm mới
+  void stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  /// Gọi ngầm để cập nhật số đo mới nhất mà không gây gián đoạn giao diện
+  Future<LatestReadingResponse?> pollLatestReading() async {
+    if (_isAutoRefreshing) return _latestReading;
+    _isAutoRefreshing = true;
+    try {
+      final data = await fetchLatestReading();
+      _latestReading = data;
+      _lastRefreshedAt = DateTime.now();
+      _autoRefreshError = null;
+      _isBackendOnline = true;
+      notifyListeners();
+      return data;
+    } catch (e) {
+      _autoRefreshError = e.toString().replaceFirst('Exception: ', '');
+      if (_mode == DataSourceMode.live) {
+        _isBackendOnline = false;
+      }
+      notifyListeners();
+      return _latestReading;
+    } finally {
+      _isAutoRefreshing = false;
+    }
+  }
 
   set mode(DataSourceMode val) {
     if (_mode != val) {
@@ -128,11 +202,12 @@ class ApiService extends ChangeNotifier {
 
   /// 2. Lấy số đo mới nhất (GET /api/v1/devices/{device_id}/readings/latest)
   Future<LatestReadingResponse> fetchLatestReading() async {
-    if (_mode == DataSourceMode.fixture) {
-      return _loadFixture(_currentScenario.filename);
-    } else {
-      return _fetchFromApi();
-    }
+    final result = _mode == DataSourceMode.fixture
+        ? await _loadFixture(_currentScenario.filename)
+        : await _fetchFromApi();
+    _latestReading = result;
+    _lastRefreshedAt = DateTime.now();
+    return result;
   }
 
   Future<LatestReadingResponse> _loadFixture(String filename) async {
@@ -257,6 +332,25 @@ class ApiService extends ChangeNotifier {
 
   /// 5. Đăng nhập người dùng (POST /api/v1/auth/login)
   Future<AuthUser> login(String username, String password) async {
+    if (_mode == DataSourceMode.fixture) {
+      if ((username == 'admin' && password == 'admin123') ||
+          (username == 'user' && password == 'user123')) {
+        _token = 'fixture-mock-token-xyz';
+        _currentUser = AuthUser(
+          id: username == 'admin' ? 1 : 2,
+          username: username,
+          role: username == 'admin' ? 'admin' : 'user',
+          fullName: username == 'admin'
+              ? 'Quản trị viên Vườn ươm'
+              : 'Kỹ thuật viên Vườn ươm',
+        );
+        notifyListeners();
+        return _currentUser!;
+      } else {
+        throw Exception('Sai tên đăng nhập hoặc mật khẩu (Thử: admin / admin123)');
+      }
+    }
+
     final uri = Uri.parse('$_baseUrl/api/v1/auth/login');
     final response = await http
         .post(
@@ -288,6 +382,16 @@ class ApiService extends ChangeNotifier {
 
   /// 7. Kích hoạt đồng bộ ThingSpeak thủ công (POST /api/v1/sync/thingspeak)
   Future<Map<String, dynamic>> triggerThingSpeakSync() async {
+    if (_mode == DataSourceMode.fixture) {
+      return {
+        'status': 'ok',
+        'message': 'Đồng bộ mô phỏng (Fixture)',
+        'fetched': 10,
+        'created': 2,
+        'duplicates': 8,
+      };
+    }
+
     final uri = Uri.parse('$_baseUrl/api/v1/sync/thingspeak');
     final response = await http
         .post(uri, headers: _getHeaders())
@@ -300,5 +404,11 @@ class ApiService extends ChangeNotifier {
       final msg = data['error']?['message'] ?? 'Đồng bộ ThingSpeak lỗi';
       throw Exception(msg);
     }
+  }
+
+  @override
+  void dispose() {
+    stopAutoRefresh();
+    super.dispose();
   }
 }

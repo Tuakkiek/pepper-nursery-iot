@@ -7,6 +7,8 @@ class DeviceStatusCard extends StatelessWidget {
   final LatestReadingResponse? latestData;
   final bool isFixtureMode;
   final bool isBackendOnline;
+  final bool autoRefreshEnabled;
+  final int refreshIntervalSeconds;
   final VoidCallback? onConfigure;
 
   const DeviceStatusCard({
@@ -14,6 +16,8 @@ class DeviceStatusCard extends StatelessWidget {
     required this.latestData,
     required this.isFixtureMode,
     this.isBackendOnline = false,
+    this.autoRefreshEnabled = true,
+    this.refreshIntervalSeconds = 3,
     this.onConfigure,
   });
 
@@ -124,6 +128,31 @@ class DeviceStatusCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (autoRefreshEnabled) ...[
+                          const SizedBox(width: AppSpacing.space1),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.tealSoft,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.autorenew, size: 10, color: AppColors.navy),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${refreshIntervalSeconds}s',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.navy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 2),

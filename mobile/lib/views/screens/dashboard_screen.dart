@@ -27,24 +27,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _loadData();
     widget.apiService.addListener(_onServiceChanged);
+    widget.apiService.startAutoRefresh();
   }
 
   @override
   void dispose() {
+    widget.apiService.stopAutoRefresh();
     widget.apiService.removeListener(_onServiceChanged);
     super.dispose();
   }
 
   void _onServiceChanged() {
-    _loadData();
+    if (widget.apiService.latestReading != null) {
+      if (mounted) {
+        setState(() {
+          _latestData = widget.apiService.latestReading;
+          _isLoading = false;
+        });
+      }
+    } else {
+      _loadData(isBackground: true);
+    }
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool isBackground = false}) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (!isBackground || _latestData == null) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final data = await widget.apiService.fetchLatestReading();
@@ -52,11 +65,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _latestData = data;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        if (_latestData == null) {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        }
         _isLoading = false;
       });
     }
@@ -85,14 +101,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Vườn Ươm Ớt Con'),
         actions: [
           IconButton(
+            icon: Icon(
+              widget.apiService.autoRefresh ? Icons.sync : Icons.sync_disabled,
+              color: widget.apiService.autoRefresh ? AppColors.teal : AppColors.textSecondary,
+            ),
+            tooltip: widget.apiService.autoRefresh
+                ? 'Tự động cập nhật mỗi ${widget.apiService.refreshIntervalSeconds}s (Đang bật)'
+                : 'Tự động cập nhật (Đang tắt)',
+            onPressed: () {
+              setState(() {
+                widget.apiService.autoRefresh = !widget.apiService.autoRefresh;
+              });
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.tune),
             tooltip: 'Cài đặt kết nối backend',
             onPressed: _openSettings,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Làm mới',
-            onPressed: _isLoading ? null : _loadData,
+            tooltip: 'Làm mới ngay',
+            onPressed: _isLoading ? null : () => _loadData(),
           ),
         ],
       ),
@@ -115,6 +145,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               latestData: _latestData,
               isFixtureMode: isFixture,
               isBackendOnline: widget.apiService.isBackendOnline,
+              autoRefreshEnabled: widget.apiService.autoRefresh,
+              refreshIntervalSeconds: widget.apiService.refreshIntervalSeconds,
               onConfigure: _openSettings,
             ),
             const SizedBox(height: AppSpacing.space3),

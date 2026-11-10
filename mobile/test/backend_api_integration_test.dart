@@ -11,12 +11,12 @@ void main() {
   setUp(() {
     apiService = ApiService();
     apiService.mode = DataSourceMode.live;
-    apiService.baseUrl = 'http://localhost:8000';
+    apiService.baseUrl = ApiService.defaultCloudUrl;
     apiService.deviceId = 'esp32-nursery-01';
   });
 
-  test('Kiểm tra cấu hình mặc định kết nối Backend TDat (Port 8000)', () {
-    expect(apiService.baseUrl.contains('8000'), isTrue);
+  test('Kiểm tra cấu hình mặc định kết nối Backend Cloud Render', () {
+    expect(apiService.baseUrl, equals('https://pepper-nursery-iot.onrender.com'));
     expect(apiService.deviceId, 'esp32-nursery-01');
     expect(apiService.mode, DataSourceMode.live);
   });
@@ -99,6 +99,122 @@ void main() {
     expect(response.reading!.sampleId, 'ts-entry-102');
     expect(response.reading!.airTemperatureC, 28.5);
     expect(response.reading!.waterPh, 6.5);
+  });
+
+  test('Phân tích phản hồi thực tế từ Backend Cloud Render với cảm biến lỗi & stale', () {
+    final liveRenderJson = {
+      'device_id': 'esp32-nursery-01',
+      'reading': {
+        'water_ph': null,
+        'device_id': 'esp32-nursery-01',
+        'sample_id': 'ts-entry-442',
+        'recorded_at': '2026-11-06T12:14:24.000Z',
+        'sensor_status': {
+          'tds': 'read_error',
+          'hd38': 'read_error',
+          'dht22': 'read_error',
+          'ds18b20': 'ok',
+          'ph4502c': 'read_error',
+        },
+        'water_tds_ppm': null,
+        'schema_version': '0.1',
+        'air_humidity_pct': null,
+        'water_ph_adc_raw': null,
+        'air_temperature_c': null,
+        'soil_moisture_pct': null,
+        'soil_moisture_raw': null,
+        'water_tds_adc_raw': null,
+        'soil_temperature_c': 4.37837,
+      },
+      'received_at': '2026-11-06T12:14:26.935Z',
+      'is_stale': true,
+      'advice': null,
+    };
+
+    final res = LatestReadingResponse.fromJson(liveRenderJson);
+    expect(res.deviceId, 'esp32-nursery-01');
+    expect(res.isStale, isTrue);
+    expect(res.reading, isNotNull);
+    expect(res.reading!.soilTemperatureC, closeTo(4.378, 0.001));
+    expect(res.reading!.airTemperatureC, isNull);
+    expect(res.reading!.sensorStatus.ds18b20, 'ok');
+    expect(res.reading!.sensorStatus.dht22, 'read_error');
+  });
+
+  test('Phân tích danh sách lịch sử HistoryResponse từ Backend', () {
+    final historyJson = {
+      'device_id': 'esp32-nursery-01',
+      'limit': 2,
+      'readings': [
+        {
+          'reading': {
+            'device_id': 'esp32-nursery-01',
+            'sample_id': 'ts-entry-442',
+            'soil_temperature_c': 4.378,
+            'sensor_status': {'ds18b20': 'ok'},
+          },
+          'received_at': '2026-11-06T12:14:26.935Z',
+        },
+        {
+          'reading': {
+            'device_id': 'esp32-nursery-01',
+            'sample_id': 'ts-entry-441',
+            'soil_temperature_c': 4.386,
+            'sensor_status': {'ds18b20': 'ok'},
+          },
+          'received_at': '2026-11-06T12:14:06.921Z',
+        },
+      ],
+    };
+
+    final history = HistoryResponse.fromJson(historyJson);
+    expect(history.deviceId, 'esp32-nursery-01');
+    expect(history.limit, 2);
+    expect(history.readings.length, 2);
+    expect(history.readings[0].reading.sampleId, 'ts-entry-442');
+  });
+
+  test('Kiểm tra chế độ Fixture Auth và Sync ThingSpeak khi không có mạng', () async {
+    apiService.mode = DataSourceMode.fixture;
+
+    // Đăng nhập fixture
+    final user = await apiService.login('admin', 'admin123');
+    expect(user.username, 'admin');
+    expect(apiService.isAuthenticated, isTrue);
+
+    // Đồng bộ fixture
+    final syncRes = await apiService.triggerThingSpeakSync();
+    expect(syncRes['status'], 'ok');
+    expect(syncRes['fetched'], 10);
+
+    // Đăng xuất
+    apiService.logout();
+    expect(apiService.isAuthenticated, isFalse);
+  });
+
+  test('Kiểm tra cấu hình và chức năng tự động cập nhật dữ liệu mỗi 3s', () async {
+    // Mặc định tự động cập nhật là bật và chu kỳ là 3 giây
+    expect(apiService.autoRefresh, isTrue);
+    expect(apiService.refreshIntervalSeconds, equals(3));
+
+    // Đổi chu kỳ sang 5 giây
+    apiService.refreshIntervalSeconds = 5;
+    expect(apiService.refreshIntervalSeconds, equals(5));
+
+    // Chuyển sang Fixture và gọi pollLatestReading
+    apiService.mode = DataSourceMode.fixture;
+    apiService.currentScenario = FixtureScenario.normal;
+
+    final polled = await apiService.pollLatestReading();
+    expect(polled, isNotNull);
+    expect(apiService.latestReading, isNotNull);
+    expect(apiService.latestReading!.deviceId, equals('esp32-nursery-01'));
+    expect(apiService.lastRefreshedAt, isNotNull);
+
+    // Bật / tắt autoRefresh
+    apiService.autoRefresh = false;
+    expect(apiService.autoRefresh, isFalse);
+    apiService.stopAutoRefresh();
   });
 }
 

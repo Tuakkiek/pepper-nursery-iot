@@ -138,7 +138,7 @@ class _CareScreenState extends State<CareScreen> {
             ),
             const SizedBox(height: AppSpacing.space1),
             const Text(
-              'Các quy tắc do MThuy & TDat cấu hình trên Backend MySQL Aiven:',
+              '',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.space3),

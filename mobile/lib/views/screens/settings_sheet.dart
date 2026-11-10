@@ -16,6 +16,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
   late FixtureScenario _scenario;
   late TextEditingController _urlController;
   late TextEditingController _deviceController;
+  late bool _autoRefresh;
+  late int _refreshInterval;
 
   // Health ping state
   bool _isCheckingHealth = false;
@@ -38,6 +40,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
     _scenario = widget.apiService.currentScenario;
     _urlController = TextEditingController(text: widget.apiService.baseUrl);
     _deviceController = TextEditingController(text: widget.apiService.deviceId);
+    _autoRefresh = widget.apiService.autoRefresh;
+    _refreshInterval = widget.apiService.refreshIntervalSeconds;
   }
 
   @override
@@ -54,6 +58,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
     widget.apiService.currentScenario = _scenario;
     widget.apiService.baseUrl = _urlController.text.trim();
     widget.apiService.deviceId = _deviceController.text.trim();
+    widget.apiService.autoRefresh = _autoRefresh;
+    widget.apiService.refreshIntervalSeconds = _refreshInterval;
     Navigator.of(context).pop(true);
   }
 
@@ -83,13 +89,16 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
     try {
       final res = await widget.apiService.triggerThingSpeakSync();
-      final added = res['added'] ?? 0;
-      final total = res['total_feeds'] ?? 0;
+      final added = res['created'] ?? res['added'] ?? 0;
+      final total = res['fetched'] ?? res['total_feeds'] ?? 0;
+      final duplicates = res['duplicates'] ?? 0;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.navy,
-            content: Text('Đồng bộ ThingSpeak thành công! ($added bản ghi mới / $total feeds)'),
+            content: Text(
+              'Đồng bộ ThingSpeak thành công! ($added bản ghi mới, $duplicates trùng / $total feeds)',
+            ),
           ),
         );
       }
@@ -215,14 +224,14 @@ class _SettingsSheetState extends State<SettingsSheet> {
             // 2. Cấu hình Backend URL khi ở chế độ Live
             if (_mode == DataSourceMode.live) ...[
               const Text(
-                'Địa chỉ Backend URL (TDat - Port 8000):',
+                'Địa chỉ Backend URL:',
                 style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
               ),
               const SizedBox(height: AppSpacing.space1),
               TextField(
                 controller: _urlController,
                 decoration: const InputDecoration(
-                  hintText: 'http://localhost:8000 hoặc http://10.0.2.2:8000',
+                  hintText: 'https://pepper-nursery-iot.onrender.com',
                   prefixIcon: Icon(Icons.link, size: 20, color: AppColors.navy),
                 ),
               ),
@@ -233,12 +242,17 @@ class _SettingsSheetState extends State<SettingsSheet> {
                 spacing: 8,
                 children: [
                   ActionChip(
+                    avatar: const Icon(Icons.cloud_done, size: 16, color: AppColors.navy),
+                    label: const Text('Cloud Render (Mặc định)'),
+                    onPressed: () => setState(() => _urlController.text = ApiService.defaultCloudUrl),
+                  ),
+                  ActionChip(
                     label: const Text('Localhost (8000)'),
-                    onPressed: () => setState(() => _urlController.text = 'http://localhost:8000'),
+                    onPressed: () => setState(() => _urlController.text = ApiService.defaultLocalUrl),
                   ),
                   ActionChip(
                     label: const Text('Android Emulator (10.0.2.2:8000)'),
-                    onPressed: () => setState(() => _urlController.text = 'http://10.0.2.2:8000'),
+                    onPressed: () => setState(() => _urlController.text = ApiService.defaultAndroidEmulatorUrl),
                   ),
                 ],
               ),
@@ -384,9 +398,103 @@ class _SettingsSheetState extends State<SettingsSheet> {
               ],
             ),
 
+            const SizedBox(height: AppSpacing.space4),
+
+            // 4. Cấu hình tự động cập nhật dữ liệu (Mặc định mỗi 3s)
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.space4),
+              decoration: BoxDecoration(
+                color: AppColors.cream,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.autorenew,
+                            color: _autoRefresh ? AppColors.teal : AppColors.textSecondary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: AppSpacing.space2),
+                          const Text(
+                            'Tự động cập nhật dữ liệu',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: AppColors.navy,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: _autoRefresh,
+                        activeThumbColor: AppColors.teal,
+                        onChanged: (val) => setState(() => _autoRefresh = val),
+                      ),
+                    ],
+                  ),
+                  if (_autoRefresh) ...[
+                    const SizedBox(height: AppSpacing.space2),
+                    const Text(
+                      'Chu kỳ cập nhật số đo mới nhất:',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: AppSpacing.space2),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Mỗi 3s (Mặc định)'),
+                          selected: _refreshInterval == 3,
+                          selectedColor: AppColors.tealSoft,
+                          labelStyle: TextStyle(
+                            color: _refreshInterval == 3 ? AppColors.navy : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) setState(() => _refreshInterval = 3);
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Mỗi 5s'),
+                          selected: _refreshInterval == 5,
+                          selectedColor: AppColors.tealSoft,
+                          labelStyle: TextStyle(
+                            color: _refreshInterval == 5 ? AppColors.navy : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) setState(() => _refreshInterval = 5);
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Mỗi 10s'),
+                          selected: _refreshInterval == 10,
+                          selectedColor: AppColors.tealSoft,
+                          labelStyle: TextStyle(
+                            color: _refreshInterval == 10 ? AppColors.navy : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) setState(() => _refreshInterval = 10);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
             const SizedBox(height: AppSpacing.space6),
 
-            // 4. Tài khoản & Phân quyền (Authentication)
+            // 5. Tài khoản & Phân quyền (Authentication)
             Container(
               padding: const EdgeInsets.all(AppSpacing.space4),
               decoration: BoxDecoration(

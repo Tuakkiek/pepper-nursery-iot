@@ -16,18 +16,20 @@
 
 ## 2. Kết nối Backend (Phase 2 & Phase 3)
 
-Backend của dự án (do TDat phụ trách) chạy trên cổng **`8000`** (`http://localhost:8000/api/v1`).
+Mặc định ứng dụng kết nối trực tiếp với Backend Cloud của dự án triển khai trên Render:
+**`https://pepper-nursery-iot.onrender.com`**
 
-### Cấu hình địa chỉ gọi API theo môi trường:
-* **Trình giả lập Android Emulator**: `http://10.0.2.2:8000` (đã cấu hình tự động nhận diện).
-* **Trình duyệt Chrome (Web) & Windows Desktop**: `http://localhost:8000`.
-* **Điện thoại thật kết nối Wi-Fi LAN**: `http://<IP_LAN_MAY_BACKEND>:8000` (ví dụ `http://192.168.1.15:8000`).
+### Cấu hình địa chỉ gọi API:
+* **Mặc định (Cloud Render)**: `https://pepper-nursery-iot.onrender.com` (chạy được trên mọi môi trường: Android máy thật, Emulator, Chrome Web, Windows Desktop).
+* **Phát triển nội bộ (Localhost)**: `http://localhost:8000` (khi chạy backend máy thật với Chrome/Desktop).
+* **Trình giả lập Android Emulator kết nối Localhost**: `http://10.0.2.2:8000`.
 
 ### Các Endpoint Backend đã tích hợp:
 1. **Kiểm tra trạng thái máy chủ (Health Check)**:
    * `GET /api/v1/health`
-2. **Số đo mới nhất**:
+2. **Số đo mới nhất (Tự động cập nhật mỗi 3s)**:
    * `GET /api/v1/devices/{device_id}/readings/latest`
+   * Mặc định ứng dụng tự động thăm dò ngầm định kỳ mỗi **3 giây** để số đo luôn ở trạng thái mới nhất theo thời gian thực mà không làm giật/nháy giao diện.
    * Hỗ trợ 3 thiết bị mẫu từ Backend:
      - `esp32-nursery-01`: Trạm hoạt động bình thường, đồng bộ số đo thật.
      - `esp32-stale-01`: Trạm mất tín hiệu > 5 phút (`is_stale: true`).
@@ -43,11 +45,13 @@ Backend của dự án (do TDat phụ trách) chạy trên cổng **`8000`** (`h
 
 ---
 
-## 3. Chuyển đổi giữa Backend Live và Dữ liệu mẫu (Fixture G0)
+## 3. Chuyển đổi giữa Backend Live, Tự động làm mới và Dữ liệu mẫu (Fixture G0)
 
 Nhấn vào biểu tượng **Cài đặt (biểu tượng thanh gạt `Tune` trên góc AppBar)** để:
 - Chuyển đổi giữa chế độ **Backend thật (API Live)** và **Dữ liệu mẫu (Fixture G0)**.
-- Đổi địa chỉ Base URL hoặc chọn nhanh (Localhost / Android Emulator).
+- Bật/tắt chế độ **Tự động cập nhật dữ liệu** và thay đổi chu kỳ làm mới (mặc định **3s**, hỗ trợ 5s, 10s).
+- Có thể bật/tắt nhanh chế độ tự động làm mới bằng nút biểu tượng **Sync** ngay trên thanh AppBar.
+- Đổi địa chỉ Base URL hoặc chọn nhanh (Cloud Render / Localhost / Android Emulator).
 - Nút **Kiểm tra kết nối (Ping Health)** kiểm tra trực tiếp máy chủ có phản hồi hay không.
 - Bấm **Đồng bộ ngay** để ép đồng bộ ThingSpeak.
 - Đăng nhập / Đăng xuất tài khoản quản trị viên.

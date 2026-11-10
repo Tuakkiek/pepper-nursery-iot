@@ -49,16 +49,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void dispose() {
     _apiService.removeListener(_onServiceChanged);
+    _apiService.dispose();
     super.dispose();
   }
 
   void _onServiceChanged() {
-    _fetchCachedLatest();
+    if (_apiService.latestReading != null) {
+      if (mounted) {
+        setState(() {
+          _cachedLatestData = _apiService.latestReading;
+        });
+      }
+    } else {
+      _fetchCachedLatest();
+    }
   }
 
   Future<void> _fetchCachedLatest() async {
     try {
-      final data = await _apiService.fetchLatestReading();
+      final data = _apiService.latestReading ?? await _apiService.fetchLatestReading();
       if (mounted) {
         setState(() {
           _cachedLatestData = data;
