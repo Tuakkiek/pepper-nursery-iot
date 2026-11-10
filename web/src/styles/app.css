@@ -630,6 +630,100 @@
   background: #FAFBF8;
 }
 
+/* Admin Rules Table - Optimized to fit 1 page with NO horizontal scroll ("không cần kéo qua kéo lại") */
+.rules-table-wrap {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+@media (min-width: 768px) {
+  .rules-table-wrap {
+    overflow-x: hidden;
+  }
+}
+
+.rules-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.rules-table th {
+  background: var(--teal-soft);
+  color: var(--brand-navy);
+  font-weight: 600;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  white-space: normal;
+  vertical-align: middle;
+}
+
+.rules-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--brand-navy);
+  font-size: 12.5px;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  vertical-align: middle;
+}
+
+.rules-table tr:hover td {
+  background: #FAFBF8;
+}
+
+.rules-table code {
+  font-size: 11px;
+  background: #EFF3F5;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 44, 62, 0.08);
+  word-break: break-all;
+}
+
+/* Pagination bar for single page / compact views */
+.table-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 8px 12px;
+  background: #FAFBFC;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.table-pagination-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--brand-navy);
+  transition: all 0.15s ease;
+}
+
+.table-pagination-btn:hover:not(:disabled) {
+  background: var(--teal-soft);
+  border-color: var(--brand-navy);
+}
+
+.table-pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ================= MODAL & OVERLAYS ================= */
 .modal-overlay {
   position: fixed;
@@ -704,6 +798,39 @@
   outline: none;
   border-color: var(--brand-navy);
   box-shadow: 0 0 0 3px var(--teal-soft);
+}
+
+/* Password Input with Eye Icon Toggle */
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap .form-input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.password-toggle-btn:hover {
+  color: var(--brand-navy);
+  background-color: var(--teal-soft);
 }
 
 /* ================= TOAST NOTIFICATION ================= */
