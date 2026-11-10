@@ -25,9 +25,11 @@
 
   QUAN TRỌNG:
   - HD-38: Phần trăm độ ẩm là GIÁ TRỊ ƯỚC LƯỢNG cho đến khi hiệu chuẩn ADC đất khô/ướt.
-  - pH: Chỉ có số đo khi đã hiệu chuẩn bằng dung dịch đệm pH 7 và pH 4.
-  - TDS: Giá trị ppm là ƯỚC LƯỢNG theo mô hình Gravity; cần hiệu chuẩn bằng dung dịch chuẩn.
-  - Không tự động tính pH khi chưa hiệu chuẩn; luôn hiển thị ADC và điện áp PO.
+  - pH: ĐÃ hiệu chuẩn với dung dịch đệm pH 6.86 và pH 4.01.
+  - TDS: Quy đổi theo hai điểm tham chiếu đo tại 0.142 V và 1.267 V.
+         Hai ppm tham chiếu trùng kết quả công thức Gravity cũ, nên CHƯA
+         được coi là hiệu chuẩn độc lập bằng dung dịch chuẩn/máy đo ngoài.
+  - pH luôn hiển thị ADC, điện áp tại GPIO35 và PO (sau khi nhân hệ số chia áp).
   - Nguồn: Jumper mạch mở rộng V-3.3V, pH cấp 5V từ cụm nguồn riêng.
   - TDS đo chất rắn hòa tan trong nước/dung dịch, KHÔNG đo N/P/K trực tiếp.
 */
@@ -38,7 +40,8 @@
 #include <DallasTemperature.h>
 #include <math.h>
 #include <WiFi.h>
-#include <ThingSpeak.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 // =============== 1. KHAI BÁO GPIO ===============
 constexpr uint8_t PIN_DHT22   = 27;
 constexpr uint8_t PIN_DS18B20 = 26;
@@ -54,17 +57,14 @@ constexpr unsigned long READ_INTERVAL_MS = 2500; // DHT22 đọc cách nhau >= 2
 const char* WIFI_SSID = "Redmi Note 11";
 const char* WIFI_PASSWORD = "Ngoc0706@";
 
-// =============== THINGSPEAK CONFIGURATION ===============
+// =============== SENSOR DATA BRIDGE CONFIGURATION ===============
+// Channel 1 cần cấu hình field1 ... field8 và một Write API Key còn hiệu lực.
+const char* FEED_URL =
+    "https://sensor-data-bridge-backend.onrender.com/api/v1/channels/1/feeds";
+const char* WRITE_API_KEY = "sdb_write_BgBpYkYlfvAWUP-I0RR4naw_0NUU4dIsqBi0Xb17OHY";
 
-unsigned long CHANNEL_ID = 3543608;
-const char* WRITE_API_KEY = "QRABGSQJ1Z8A67RD";
-
-WiFiClient client;
-
-// Gửi dữ liệu mỗi 20 giây
-constexpr unsigned long THINGSPEAK_INTERVAL_MS = 20000;
-
-unsigned long lastThingSpeakUpload = 0;
+constexpr unsigned long BACKEND_INTERVAL_MS = 20000;
+unsigned long lastBackendUpload = 0;
 // =============== 2. THÔNG SỐ HIỆU CHUẨN ===============
 // HD-38: Đây là giá trị ADC VÍ DỤ; thay bằng giá trị ADC đo được của bạn.
 constexpr int SOIL_ADC_DRY = 3400;  // Giá trị ADC khi đất khô
@@ -77,14 +77,22 @@ constexpr float PH_R1_OHM = 10000.0f; // PO -> R1 -> GPIO35
 constexpr float PH_R2_OHM = 10000.0f; // GPIO35 -> R2 -> GND
 constexpr float PH_VOLTAGE_FACTOR = (PH_R1_OHM + PH_R2_OHM) / PH_R2_OHM; // = 2.0
 
-// Hai giá trị điện áp PO gốc (đơn vị V) khi nhúng điện cực vào dung dịch đệm pH 7 và pH 4.
-// Mặc định hiệu chuẩn theo Nernst lý thuyết (pH 7 -> 2.500V, pH 4.01 -> 2.677V).
-// Có thể thay bằng số thực tế đo từ dung dịch đệm khi cần độ chính xác cao hơn.
-constexpr float PH_VOLT_AT_7 = 2.500f;
-constexpr float PH_VOLT_AT_4 = 2.677f;
+// Hiệu chuẩn pH HAI ĐIỂM THỰC TẾ trên điện áp PO (không phải điện áp GPIO35).
+// GPIO35 nhận PO qua mạch chia áp 10k/10k, vì vậy ph.pinVoltage sẽ được nhân 2.
+constexpr float PH_VOLT_AT_6_86 = 1.376f;
+constexpr float PH_VOLT_AT_4_01 = 1.858f;
+constexpr float PH_BUFFER_6_86  = 6.86f;
+constexpr float PH_BUFFER_4_01  = 4.01f;
 
-// TDS: Hệ số kinh nghiệm; cần hiệu chuẩn bằng dung dịch TDS chuẩn.
-constexpr float TDS_CALIBRATION_FACTOR = 1.0f;
+// TDS - hai điểm tham chiếu do người đo ghi nhận (điện áp ở GPIO32).
+// Chỉ là nội suy theo hai cặp điện áp-ppm; KHÔNG phải hiệu chuẩn chính xác
+// nếu ppm tham chiếu được tính từ chính công thức TDS của ESP32.
+constexpr float TDS_VOLT_RO        = 0.142f;
+constexpr float TDS_PPM_RO         = 58.5f;
+constexpr float TDS_VOLT_SALINE    = 1.267f;
+constexpr float TDS_PPM_SALINE     = 473.4f;
+// Chỉ đổi true khi số ppm được đối chiếu với dung dịch TDS chuẩn/máy đo độc lập.
+constexpr bool TDS_REFERENCE_VERIFIED = false;
 
 // Chỉ bật true nếu DS18B20 đo CÙNG nước/dung dịch với đầu dò TDS.
 // Nếu DS18B20 đang cắm trong đất, giữ false (TDS mặc định 25 độ C).
@@ -125,13 +133,15 @@ float soilPercentFromRaw(int raw) {
 }
 
 float calculatePH(float originalPOVoltage) {
-  if (PH_VOLT_AT_7 < 0.0f || PH_VOLT_AT_4 < 0.0f ||
-      fabsf(PH_VOLT_AT_4 - PH_VOLT_AT_7) < 0.01f) {
-    return NAN; // Chưa hiệu chuẩn
+  if (!isfinite(originalPOVoltage) ||
+      fabsf(PH_VOLT_AT_4_01 - PH_VOLT_AT_6_86) < 0.01f) {
+    return NAN;
   }
-  // Nội suy tuyến tính theo hai điểm pH 7 và pH 4.
-  float ph = 7.0f + (originalPOVoltage - PH_VOLT_AT_7) *
-                (4.01f - 7.0f) / (PH_VOLT_AT_4 - PH_VOLT_AT_7);
+  // pH = 6.86 + (V_PO - 1.376) * (4.01 - 6.86) / (1.858 - 1.376).
+  float ph = PH_BUFFER_6_86 +
+             (originalPOVoltage - PH_VOLT_AT_6_86) *
+             (PH_BUFFER_4_01 - PH_BUFFER_6_86) /
+             (PH_VOLT_AT_4_01 - PH_VOLT_AT_6_86);
   if (ph < 0.0f) ph = 0.0f;
   if (ph > 14.0f) ph = 14.0f;
   return ph;
@@ -149,11 +159,23 @@ const char* getPHEnvironment(float ph) {
 }
 
 float calculateTDS(float voltage, float temperatureC) {
-  // Công thức gần đúng cho TDS Meter V1.0 / Gravity Analog TDS.
+  if (!isfinite(voltage) || !isfinite(temperatureC) ||
+      fabsf(TDS_VOLT_SALINE - TDS_VOLT_RO) < 0.001f) {
+    return NAN;
+  }
+  // Bu nhiet gan dung ve 25 C. De mac dinh 25 C neu dau DS18B20 do dat.
+  // Hai moc dien ap TDS duoc gia dinh la do tai 25 C; neu khong phai,
+  // can do lai trong dung dich chuan co nhiet do xac dinh.
   const float coefficient = 1.0f + 0.02f * (temperatureC - 25.0f);
-  const float v = voltage / coefficient;
-  const float ppm = (133.42f * v * v * v - 255.86f * v * v +
-                     857.39f * v) * 0.5f * TDS_CALIBRATION_FACTOR;
+  if (coefficient <= 0.0f) return NAN;
+  const float voltage25 = voltage / coefficient;
+
+  // Noi suy 2 diem: (0.142V,58.5ppm), (1.267V,473.4ppm).
+  // Ngoai khoang hai moc, day la NGOAI SUY va ket qua khong chac chan.
+  const float ppm = TDS_PPM_RO +
+                    (voltage25 - TDS_VOLT_RO) *
+                    (TDS_PPM_SALINE - TDS_PPM_RO) /
+                    (TDS_VOLT_SALINE - TDS_VOLT_RO);
   return (ppm > 0.0f) ? ppm : 0.0f;
 }
 void connectWiFi() {
@@ -187,7 +209,15 @@ void connectWiFi() {
     Serial.println("Khong the ket noi Wi-Fi!");
   }
 }
-void uploadToThingSpeak(
+void appendField(String& body, const char* key, const String& value) {
+  if (body.length() > 1) body += ',';
+  body += '"';
+  body += key;
+  body += "\":";
+  body += value;
+}
+
+void uploadToBackend(
   TempAndHumidity air,
   bool airOK,
   float probeC,
@@ -208,48 +238,42 @@ void uploadToThingSpeak(
     return;
   }
 
-  // Field 1: Nhiet do khong khi
-  ThingSpeak.setField(1,
-    airOK ? String(air.temperature, 1) : String(""));
-
-  // Field 2: Do am khong khi
-  ThingSpeak.setField(2,
-    airOK ? String(air.humidity, 1) : String(""));
-
-  // Field 3: Nhiet do dau do
-  ThingSpeak.setField(3,
-    probeOK ? String(probeC, 2) : String(""));
-
-  // Field 4: Do am dat
-  ThingSpeak.setField(4,
-    isnan(soilPercent) ? String("") : String(soilPercent, 1));
-
-  // Field 5: pH
-  ThingSpeak.setField(5,
-    isnan(phValue) ? String("") : String(phValue, 2));
-
-  // Field 6: TDS
-  ThingSpeak.setField(6, String(tdsPpm, 1));
-
-  // Field 7: ADC dat
-  ThingSpeak.setField(7, String(soilADC));
-
-  // Field 8: ADC pH
-  ThingSpeak.setField(8, String(phADC));
-
-  // Gui tat ca cac Field
-  int response = ThingSpeak.writeFields(
-    CHANNEL_ID,
-    WRITE_API_KEY
-  );
-
-  if (response == 200) {
-    Serial.println();
-    Serial.println("THINGSPEAK: GUI DU LIEU THANH CONG!");
-  } else {
-    Serial.print("THINGSPEAK: LOI GUI DU LIEU. HTTP CODE = ");
-    Serial.println(response);
+  String body = "{";
+  if (airOK) {
+    appendField(body, "field1", String(air.temperature, 1));
+    appendField(body, "field2", String(air.humidity, 1));
   }
+  if (probeOK) appendField(body, "field3", String(probeC, 2));
+  if (isfinite(soilPercent)) appendField(body, "field4", String(soilPercent, 1));
+  if (isfinite(phValue)) appendField(body, "field5", String(phValue, 2));
+  if (isfinite(tdsPpm)) appendField(body, "field6", String(tdsPpm, 1));
+  appendField(body, "field7", String(soilADC));
+  appendField(body, "field8", String(phADC));
+  body += '}';
+
+  WiFiClientSecure client;
+  // Giống sketch DHT hiện tại: mã hóa HTTPS nhưng chưa xác minh chứng chỉ máy chủ.
+  client.setInsecure();
+
+  HTTPClient http;
+  if (!http.begin(client, FEED_URL)) {
+    Serial.println("BACKEND: Khong khoi tao duoc HTTPS.");
+    return;
+  }
+  http.setTimeout(60000);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-API-Key", WRITE_API_KEY);
+
+  const int response = http.POST(body);
+  if (response == HTTP_CODE_CREATED) {
+    Serial.println("BACKEND: GUI DU LIEU THANH CONG!");
+  } else if (response > 0) {
+    Serial.printf("BACKEND: HTTP %d: %s\n", response, http.getString().c_str());
+  } else {
+    Serial.printf("BACKEND: LOI KET NOI HTTPS: %s\n",
+                  http.errorToString(response).c_str());
+  }
+  http.end();
 }
 void setup() {
   Serial.begin(BAUD_RATE);
@@ -278,16 +302,17 @@ void setup() {
   Serial.printf("Số cảm biến DS18B20 tìm thấy: %d\n", ds18b20.getDeviceCount());
   Serial.println("Đã xác nhận: DHT22 và DS18B20 có điện trở kéo lên trên module.");
   Serial.println("Jumper: V-3.3V; pH: nguồn 5V riêng + chia áp 10k/10k.");
-  Serial.println("Cần hiệu chuẩn HD-38, pH và TDS trước khi sử dụng định lượng.");
+  Serial.println("pH: DA HIEU CHUAN 2 DIEM (6.86 / 4.01).");
+  Serial.printf("pH PO: %.3f V tai pH 6.86 | %.3f V tai pH 4.01\n",
+                PH_VOLT_AT_6_86, PH_VOLT_AT_4_01);
+  Serial.println("HD-38: chua hieu chuan do am dat.");
+  Serial.println("TDS: quy doi theo 2 diem tham chieu; chua xac minh dung dich chuan.");
 
   // Ket noi Wi-Fi
-connectWiFi();
+  connectWiFi();
 
-// Khoi tao ThingSpeak
-ThingSpeak.begin(client);
-
-Serial.println("ThingSpeak da khoi tao!");
-Serial.printf("Channel ID: %lu\n", CHANNEL_ID);
+  Serial.println("Backend: sensor-data-bridge-backend.onrender.com");
+  Serial.println("Channel ID: 1");
 }
 
 void loop() {
@@ -346,15 +371,34 @@ void loop() {
   Serial.printf("4. pH        | ADC: %u | Điện áp GPIO35: %.3f V | PO: %.3f V",
                 ph.raw, ph.pinVoltage, phModuleVoltage);
   if (isnan(phValue)) {
-    Serial.println(" | pH: CHƯA HIỆU CHUẨN (dung dịch đệm pH 7 và pH 4)");
+    Serial.println(" | pH: LOI TINH TOAN / CAN KIEM TRA HIEU CHUAN");
   } else {
-    Serial.printf(" | pH: %.2f | Môi trường: %s\n", phValue, getPHEnvironment(phValue));
+    Serial.printf(" | pH: %.2f (DA HIEU CHUAN 6.86/4.01) | Môi trường: %s\n",
+                  phValue, getPHEnvironment(phValue));
+    if (phModuleVoltage < PH_VOLT_AT_6_86 ||
+        phModuleVoltage > PH_VOLT_AT_4_01) {
+      Serial.println("   Luu y pH: dien ap nam NGOAI khoang 2 moc hieu chuan.");
+    }
   }
 
-  Serial.printf("5. TDS       | ADC: %u | Điện áp: %.3f V | %.1f ppm (ƯỚC LƯỢNG, chưa hiệu chuẩn)\n",
-                tds.raw, tds.pinVoltage, tdsPpm);
+  Serial.printf("5. TDS       | ADC: %u | Điện áp: %.3f V", tds.raw, tds.pinVoltage);
+  if (isfinite(tdsPpm)) {
+    Serial.printf(" | %.1f ppm (%s)\n", tdsPpm,
+                  TDS_REFERENCE_VERIFIED ? "2 diem da doi chieu chuan"
+                                         : "NOI SUY 2 DIEM, CHUA KIEM CHUNG CHUAN");
+  } else {
+    Serial.println(" | LOI TINH TDS");
+  }
   Serial.printf("   Bù nhiệt TDS: %.1f C (%s)\n", tdsTemperature,
                 TDS_USE_DS18B20_TEMPERATURE ? "DS18B20 nếu hợp lệ" : "Mặc định");
+  const float tdsVoltage25 = tds.pinVoltage /
+                              (1.0f + 0.02f * (tdsTemperature - 25.0f));
+  if (tdsVoltage25 < TDS_VOLT_RO || tdsVoltage25 > TDS_VOLT_SALINE) {
+    Serial.println("   Luu y TDS: ngoai khoang 0.142-1.267V, ket qua la NGOAI SUY.");
+  }
+  if (tds.raw == 0 && tds.pinVoltage >= 0.05f) {
+    Serial.println("   CANH BAO TDS: ADC=0 nhung dien ap mV >0; kiem tra ADC va do dong ho.");
+  }
 
   if (soil.raw >= 4080 || ph.raw >= 4080 || tds.raw >= 4080) {
     Serial.println("CẢNH BÁO: ADC gần mức tối đa, cần đo điện áp tín hiệu bằng đồng hồ!");
@@ -365,23 +409,21 @@ void loop() {
   Serial.println("----------------------------------------------------");
 
   delay(READ_INTERVAL_MS);
-  // =============== GUI DU LIEU THINGSPEAK ===============
+  // =============== GUI DU LIEU LEN BACKEND ===============
 
-if (lastThingSpeakUpload == 0 ||
-    millis() - lastThingSpeakUpload >= THINGSPEAK_INTERVAL_MS) {
-
-  lastThingSpeakUpload = millis();
-
-  uploadToThingSpeak(
-    air,
-    airOK,
-    probeC,
-    probeOK,
-    soilPercent,
-    soil.raw,
-    phValue,
-    ph.raw,
-    tdsPpm
-  );
-}
+  if (lastBackendUpload == 0 ||
+      millis() - lastBackendUpload >= BACKEND_INTERVAL_MS) {
+    lastBackendUpload = millis();
+    uploadToBackend(
+      air,
+      airOK,
+      probeC,
+      probeOK,
+      soilPercent,
+      soil.raw,
+      phValue,
+      ph.raw,
+      tdsPpm
+    );
+  }
 }
