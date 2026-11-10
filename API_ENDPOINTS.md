@@ -24,11 +24,10 @@
 
 ### Base URL:
 * **Local Development:** `http://localhost:8000/api/v1`
-* **Production API Host (Render):** `https://sensor-data-bridge-backend.onrender.com/api/v1`
-* **Frontend Web Management UI:** `https://sensor-data-bridge-frontened.onrender.com`
+* **Production (Render):** `https://sensor-data-bridge.onrender.com/api/v1`
 * **Interactive API Docs:**
-  * Swagger UI: `https://sensor-data-bridge-backend.onrender.com/docs`
-  * ReDoc: `https://sensor-data-bridge-backend.onrender.com/redoc`
+  * Swagger UI: `{BASE_URL}/docs`
+  * ReDoc: `{BASE_URL}/redoc`
 
 ### Các cơ chế xác thực hỗ trợ:
 1. **Public (Không cần Auth):** Dành cho kiểm tra server, đăng ký/đăng nhập và endpoint sensor legacy.
@@ -59,7 +58,8 @@
 | **Channels** | `POST` | `/api/v1/channels/{id}/api_keys` | Bearer JWT | Tạo khóa Write Key hoặc Read Key mới (16 ký tự) |
 | **Channels** | `DELETE` | `/api/v1/channels/{id}/api_keys/{key_id}` | Bearer JWT | Thu hồi (hủy) API Key |
 | **Channels** | `POST` | `/api/v1/channels/{id}/feeds` | **X-API-Key (Write)** | **ESP32 gửi số đo các field lên kênh** |
-| **Channels** | `GET` | `/api/v1/channels/{id}/feeds` | **X-API-Key (Read)** / JWT | **Web ngoài hoặc Dashboard lấy dữ liệu phân trang & lọc thời gian** |
+| **Channels** | `GET` | `/api/v1/channels/{id}/feeds` | **X-API-Key (Read)** / JWT | **Web ngoài lấy dữ liệu phân trang & lọc thời gian linh hoạt** |
+| **Channels** | `GET` | `/api/v1/channels/{id}/feeds/range` | **X-API-Key (Read)** / JWT | **Chuyên biệt: Lọc theo ngày bắt đầu/kết thúc & giờ bắt đầu/kết thúc** |
 | **Channels** | `GET` | `/api/v1/channels/{id}/private_show` | Bearer JWT | Lấy trọn bộ metadata + feeds phục vụ Dashboard đồ họa |
 | **Projects** | `GET` | `/api/v1/projects` | Bearer JWT | Danh sách các Project của user |
 | **Projects** | `POST` | `/api/v1/projects` | Bearer JWT | Tạo Project quản lý thiết bị mới |
@@ -195,18 +195,37 @@
   * `page` (int, default: `1`): Số trang cần xem.
   * `page_size` (int, default: `20`, max: `100`): Số dòng mỗi trang.
   * `limit` (int, 1–1000, optional): Lấy nhanh N dòng mới nhất.
-  * `start_at` (ISO Datetime, optional): Thời điểm bắt đầu (ví dụ: `2026-11-01T00:00:00Z`).
-  * `end_at` (ISO Datetime, optional): Thời điểm kết thúc.
+  * `start_at` / `end_at` (ISO Datetime, optional): Mốc thời gian ISO (ví dụ: `2026-11-01T00:00:00Z`).
+  * `start_date` / `end_date` (string `YYYY-MM-DD`, optional): Ngày bắt đầu / kết thúc.
+  * `start_time` / `end_time` (string `HH:MM` hoặc `HH:MM:SS`, optional): Giờ bắt đầu / kết thúc.
+  * `tz` (string, default: `+07:00`): Múi giờ địa phương (ví dụ `+07:00` Việt Nam hoặc `UTC`).
   * `order` (`desc` hoặc `asc`, default: `desc`): `desc` là dữ liệu mới nhất ở đầu.
+
+---
+
+#### 4. Endpoint Chuyên biệt Lọc theo Ngày & Giờ: `GET /api/v1/channels/{channel_id}/feeds/range`
+Endpoint thiết kế riêng cho web bên thứ ba truy vấn theo khung ngày giờ trực quan:
+* **Headers:** `X-API-Key: <16_CHAR_READ_KEY>` *(hoặc `Authorization: Bearer <JWT>`)*
+* **Query Parameters bắt buộc:**
+  * `start_date` (string, **bắt buộc**): Ngày bắt đầu, định dạng `YYYY-MM-DD` (Ví dụ: `2026-11-08`).
+  * `end_date` (string, **bắt buộc**): Ngày kết thúc, định dạng `YYYY-MM-DD` (Ví dụ: `2026-11-10`).
+* **Query Parameters tùy chọn:**
+  * `start_time` (string, mặc định: `00:00:00`): Giờ bắt đầu (`HH:MM` hoặc `HH:MM:SS`, ví dụ: `08:30`).
+  * `end_time` (string, mặc định: `23:59:59`): Giờ kết thúc (`HH:MM` hoặc `HH:MM:SS`, ví dụ: `17:45`).
+  * `tz` (string, mặc định: `+07:00`): Múi giờ địa phương (Hệ thống tự động quy đổi về UTC chính xác).
+  * `page` (int, mặc định: `1`): Số trang.
+  * `page_size` (int, mặc định: `20`, tối đa: `100`): Số dòng mỗi trang.
+  * `limit` (int, 1–1000, optional): Lấy nhanh N dòng gần nhất trong khoảng thời gian.
+  * `order` (`desc` hoặc `asc`, mặc định: `desc`): Sắp xếp mới nhất trước hoặc cũ nhất trước.
 
 * **Response (200 OK):**
   ```json
   {
     "channel_id": 1,
-    "total": 520,
+    "total": 142,
     "page": 1,
     "page_size": 20,
-    "total_pages": 26,
+    "total_pages": 8,
     "feeds": [
       {
         "id": 520,
@@ -221,7 +240,7 @@
           "field7": 4095.0,
           "field8": 296.0
         },
-        "received_at": "2026-11-10T08:45:10Z"
+        "received_at": "2026-11-08T09:15:20Z"
       }
     ]
   }
@@ -229,7 +248,7 @@
 
 ---
 
-#### 4. Xem dữ liệu toàn diện kênh: `GET /api/v1/channels/{channel_id}/private_show`
+#### 5. Xem dữ liệu toàn diện kênh: `GET /api/v1/channels/{channel_id}/private_show`
 * **Headers:** `Authorization: Bearer <JWT_TOKEN>`
 * **Query Parameters:** `limit` (default: 100)
 * **Response (200 OK):** Bao gồm thông tin đầy đủ về Kênh, cấu hình các Field, tổng số bản ghi và các feed gần nhất để dựng biểu đồ.
@@ -297,17 +316,28 @@
 
 ---
 
-## 4. HƯỚNG DẪN TÍCH HỢP TRỰC TIẾP CHO BÊN THỨ BA (SENSOR DATA BRIDGE)
+## 4. HƯỚNG DẪN TÍCH HỢP CHO WEB/ỨNG DỤNG BÊN NGOÀI
 
-### Ví dụ 1: Web bên ngoài gọi lấy dữ liệu trực tiếp từ Sensor Data Bridge (JavaScript / Fetch)
+### Ví dụ 1: Web bên thứ ba gọi lấy dữ liệu theo ngày & giờ (JavaScript / Fetch)
 ```javascript
-const BRIDGE_API_URL = "https://sensor-data-bridge-backend.onrender.com/api/v1";
 const CHANNEL_ID = 1;
-const READ_API_KEY = "sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw";
+const READ_API_KEY = "kU7xP2wL9mQ4vN8j"; // 16 ký tự Read API Key do bạn cung cấp
 
-async function loadLatestFeeds() {
+// Truy vấn từ 08:00 ngày 08/11/2026 đến 17:30 ngày 10/11/2026 (Múi giờ Việt Nam +07:00)
+async function loadFeedsByRange() {
+  const params = new URLSearchParams({
+    start_date: "2026-11-08",
+    start_time: "08:00",
+    end_date: "2026-11-10",
+    end_time: "17:30",
+    tz: "+07:00",
+    page: "1",
+    page_size: "20",
+    order: "desc"
+  });
+
   try {
-    const url = `${BRIDGE_API_URL}/channels/${CHANNEL_ID}/feeds?limit=20`;
+    const url = `https://sensor-data-bridge.onrender.com/api/v1/channels/${CHANNEL_ID}/feeds/range?${params.toString()}`;
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -317,11 +347,11 @@ async function loadLatestFeeds() {
     });
 
     if (!response.ok) {
-      throw new Error(`Lỗi kết nối Bridge: ${response.status}`);
+      throw new Error(`Lỗi kết nối: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Tổng số dòng:", data.total);
+    console.log(`Tìm thấy tổng cộng ${data.total} bản ghi (Trang ${data.page}/${data.total_pages})`);
     console.log("Danh sách đo đạc:", data.feeds);
   } catch (error) {
     console.error("Không thể lấy dữ liệu:", error);
@@ -329,216 +359,86 @@ async function loadLatestFeeds() {
 }
 ```
 
-### Ví dụ 2: Lấy dữ liệu bằng cURL
+### Ví dụ 2: Web bên thứ ba gọi bằng Python (Requests)
+```python
+import requests
+
+CHANNEL_ID = 1
+READ_API_KEY = "kU7xP2wL9mQ4vN8j"
+
+url = f"https://sensor-data-bridge.onrender.com/api/v1/channels/{CHANNEL_ID}/feeds/range"
+headers = {"X-API-Key": READ_API_KEY}
+params = {
+    "start_date": "2026-11-08",
+    "start_time": "08:00",
+    "end_date": "2026-11-10",
+    "end_time": "17:30",
+    "tz": "+07:00",
+    "page": 1,
+    "page_size": 20
+}
+
+response = requests.get(url, headers=headers, params=params)
+if response.status_code == 200:
+    data = response.json()
+    print(f"Tổng số bản ghi: {data['total']}")
+    print(data['feeds'])
+else:
+    print(f"Lỗi: {response.status_code} - {response.text}")
+```
+
+### Ví dụ 3: Lấy dữ liệu bằng cURL theo khoảng ngày giờ
 ```bash
-curl -X GET "https://sensor-data-bridge-backend.onrender.com/api/v1/channels/1/feeds?limit=10" \
-     -H "X-API-Key: sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw" \
+curl -X GET "https://sensor-data-bridge.onrender.com/api/v1/channels/1/feeds/range?start_date=2026-11-08&start_time=08:00&end_date=2026-11-10&end_time=18:00&tz=+07:00&page=1&page_size=50" \
+     -H "X-API-Key: kU7xP2wL9mQ4vN8j" \
      -H "Accept: application/json"
 ```
 
-### Ví dụ 3: ESP32 gửi dữ liệu lên kênh (C++ / Arduino)
+### Ví dụ 4: Lấy nhanh 20 dòng mới nhất
+```bash
+curl -X GET "https://sensor-data-bridge.onrender.com/api/v1/channels/1/feeds?limit=20" \
+     -H "X-API-Key: kU7xP2wL9mQ4vN8j" \
+     -H "Accept: application/json"
+```
+
+### Ví dụ 5: ESP32 gửi dữ liệu lên kênh (C++ / Arduino)
 ```cpp
-HTTPClient http;
-http.begin("https://sensor-data-bridge-backend.onrender.com/api/v1/channels/1/feeds");
-http.addHeader("Content-Type", "application/json");
-http.addHeader("X-API-Key", "sdb_write_..."); // 16+ ký tự Write API Key do QTien cấu hình
+#include <WiFi.h>
+#include <HTTPClient.h>
 
-String payload = "{\"field1\":32.7,\"field2\":69.5,\"field3\":32.0,\"field4\":0.0,\"field5\":3.28,\"field6\":58.5,\"field7\":4095.0,\"field8\":1022.0}";
-int httpCode = http.POST(payload);
-http.end();
-```
+const char* serverUrl = "https://sensor-data-bridge.onrender.com/api/v1/channels/1/feeds";
+const char* writeKey = "wA3kP8mN5vL1xR9q"; // 16 ký tự Write Key
 
----
+void postSensorData(float temp, float hum, float soil) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-API-Key", writeKey);
 
-## 5. HƯỚNG DẪN KẾT NỐI CHO FRONTEND WEB (DKHOA) VÀ MOBILE APP (QTHANG)
-### (Dự án: Hệ thống Giám sát Vườn ươm Ớt con - Pepper Nursery IoT)
+    String body = "{\"field1\":" + String(temp, 1) + 
+                  ",\"field2\":" + String(hum, 1) + 
+                  ",\"field3\":" + String(soil, 1) + "}";
 
-### 5.1. Kiến trúc Hệ thống & Giải đáp: "Có thể bỏ qua lưu vào Database không?"
-
-* **Sensor Data Bridge hoạt động như một Time-Series Database:** 
-  Khi trạm ESP32 của QTien đẩy dữ liệu lên, Sensor Data Bridge đã tự động ghi nhận và lưu trữ toàn bộ các số đo từ thời điểm thiết bị bật.
-* **Backend TDat có thể bỏ qua lưu `readings` vào MySQL:**
-  - Trong file `.env`, Backend hỗ trợ tùy chọn:
-    ```env
-    # Đặt false để bỏ qua lưu số đo thô vào MySQL, giảm tải dung lượng CSDL:
-    SAVE_READINGS_TO_DB=false
-    ```
-  - Khi đặt `SAVE_READINGS_TO_DB=false`, Backend TDat **không cần lưu hàng triệu dòng số đo vào bảng `readings` của MySQL** mà duy trì bộ đệm RAM (In-Memory Cache) được cập nhật định kỳ từ Bridge.
-* **Những phần BẮT BUỘC vẫn cần Database MySQL (Aiven Cloud):**
-  1. **Bảng `users`:** Quản lý tài khoản đăng nhập `admin` và `user`, mật mã băm an toàn qua bcrypt.
-  2. **Bảng `care_rules`:** Quản lý 24+ quy tắc sinh học chăm sóc ớt con động do Admin thêm/sửa/xóa qua giao diện Admin Console.
-
----
-
-### 5.2. Tại sao Web và Mobile nên gọi qua Backend TDat thay vì gọi trực tiếp Bridge?
-
-| Tiêu chí so sánh | Gọi trực tiếp Sensor Data Bridge | Gọi qua Backend TDat (Khuyến nghị chuẩn) |
-| :--- | :--- | :--- |
-| **Tên trường số đo** | `field1..field8` vô nghĩa, phải tự map | Tên trường chuẩn nông học: `air_temperature_c`, `water_ph`, `soil_moisture_pct`... |
-| **Lời khuyên sinh học (`advice`)** | **KHÔNG CÓ** (chỉ có số thô) | **Tự động đánh giá theo chuẩn nông học của MThuy** (`optimal`, `warning`, `danger`, `insufficient_data`) kèm `code` và `suggested_action` |
-| **Cảnh báo dữ liệu cũ (`is_stale`)** | **KHÔNG CÓ** | **Tự động phát hiện trạm mất liên lạc quá 5 phút** (`is_stale: true`) để hiển thị nhãn cảnh báo |
-| **Trạng thái cảm biến (`sensor_status`)**| **KHÔNG CÓ** | Tự động phân biệt `ok`, `read_error`, `not_calibrated` cho từng cảm biến độc lập |
-| **Xác thực & Phân quyền (Auth)** | Không có auth người dùng vườn ươm | Có sẵn JWT Auth: vai trò `admin` và `user` (`/api/v1/auth/login`) |
-| **Quản trị Quy tắc Chăm sóc** | **KHÔNG CÓ** | Đầy đủ API CRUD Care Rules (`/api/v1/rules`) cho Admin Console |
-| **Bảo mật API Key** | Phải để lộ `READ_API_KEY` trong mã nguồn frontend | API Key được giấu an toàn trên server, frontend không lo lộ key |
-
----
-
-### 5.3. Chi tiết API Endpoints Backend TDat dành cho Web (DKhoa) & Mobile (QThang)
-
-* **Base URL Backend:** 
-  * Cloud Render: `https://pepper-nursery-iot.onrender.com/api/v1`
-  * Local Dev: `http://localhost:8000/api/v1`
-
-#### 1. Lấy số đo mới nhất của vườn ươm (Kèm lời khuyên chăm sóc sinh học)
-* **Endpoint:** `GET /api/v1/devices/esp32-nursery-01/readings/latest`
-* **Response (200 OK):**
-```json
-{
-  "device_id": "esp32-nursery-01",
-  "received_at": "2026-11-10T08:02:17.717Z",
-  "is_stale": false,
-  "reading": {
-    "schema_version": "0.1",
-    "device_id": "esp32-nursery-01",
-    "sample_id": "sdb-entry-113",
-    "recorded_at": "2026-11-08T06:14:53.000Z",
-    "air_temperature_c": 32.7,
-    "air_humidity_pct": 69.5,
-    "soil_temperature_c": 32.0,
-    "soil_moisture_pct": 0.0,
-    "soil_moisture_raw": 4095,
-    "water_ph": 3.28,
-    "water_ph_adc_raw": 1022,
-    "water_tds_ppm": 58.5,
-    "water_tds_adc_raw": null,
-    "sensor_status": {
-      "dht22": "ok",
-      "ds18b20": "ok",
-      "hd38": "ok",
-      "tds": "ok",
-      "ph4502c": "ok"
-    }
-  },
-  "advice": {
-    "version": "0.1",
-    "status": "danger",
-    "priority": 2,
-    "code": "RULE_TEMP_EXTREME_HIGH",
-    "message": "Nhiệt độ không khí cực cao: Kéo lưới che 70% nắng, bật phun sương mái làm mát. | Giá thể cực khô hạn: Tưới bù ẩm khẩn cấp bằng phun sương mịn đều mặt khay. | Nước tưới cực chua (Axit nặng): Tuyệt đối không tưới! Dùng nước vôi trong nâng pH lên 6.0-6.5.",
-    "suggested_action": "Kéo lưới che 70% nắng, bật phun sương mái làm mát.; Tưới bù ẩm khẩn cấp bằng phun sương mịn đều mặt khay.; Tuyệt đối không tưới! Dùng nước vôi trong nâng pH lên 6.0-6.5."
+    int code = http.POST(body);
+    Serial.printf("POST Code: %d\n", code);
+    http.end();
   }
 }
 ```
 
-#### 2. Lấy lịch sử số đo để vẽ biểu đồ quan trắc (Trends & Chart)
-* **Endpoint:** `GET /api/v1/devices/esp32-nursery-01/readings?limit=20`
-* **Response (200 OK):**
-```json
-{
-  "device_id": "esp32-nursery-01",
-  "limit": 20,
-  "readings": [
-    {
-      "reading": {
-        "air_temperature_c": 32.7,
-        "air_humidity_pct": 69.5,
-        "soil_temperature_c": 32.0,
-        "soil_moisture_pct": 0.0,
-        "water_ph": 3.28,
-        "water_tds_ppm": 58.5,
-        "recorded_at": "2026-11-08T06:14:53.000Z"
-      },
-      "received_at": "2026-11-10T08:02:17.717Z"
-    }
-  ]
-}
-```
-
-#### 3. Đăng nhập người dùng (Authentication)
-* **Endpoint:** `POST /api/v1/auth/login`
-* **Body:**
-  ```json
-  { "username": "admin", "password": "admin123" }
-  ```
-  *(Hoặc kỹ thuật viên: `{ "username": "user", "password": "user123" }`)*
-* **Response (200 OK):**
-  ```json
-  {
-    "status": "ok",
-    "token": "eyJhbGciOiJIUzI1NiIsIn...",
-    "user": { "id": 1, "username": "admin", "full_name": "Quản trị viên Vườn ươm", "role": "admin" }
-  }
-  ```
-
-#### 4. Xem thông tin tài khoản đang đăng nhập
-* **Endpoint:** `GET /api/v1/auth/me`
-* **Headers:** `Authorization: Bearer <TOKEN>`
-
-#### 5. Quản lý Quy tắc Chăm sóc Cây ớt con (Care Rules)
-* `GET /api/v1/rules`: Lấy danh sách các quy tắc chăm sóc đang hoạt động (Public / User / Admin).
-* `POST /api/v1/rules`: Thêm quy tắc chăm sóc mới (Yêu cầu Token `admin`).
-* `PUT /api/v1/rules/{id}`: Cập nhật ngưỡng hoặc lời khuyên của quy tắc (Yêu cầu Token `admin`).
-* `DELETE /api/v1/rules/{id}`: Xóa quy tắc (Yêu cầu Token `admin`).
-
-#### 6. Kiểm tra trạng thái và Ép đồng bộ Sensor Data Bridge
-* `GET /api/v1/sync/bridge/status`: Kiểm tra trạng thái kết nối tới Sensor Data Bridge (kênh, chu kỳ polling, lỗi nếu có).
-* `POST /api/v1/sync/bridge`: Ép backend kéo số đo mới nhất ngay lập tức từ Bridge mà không cần đợi chu kỳ 20 giây.
-
 ---
 
-### 5.4. Code mẫu tích hợp chuẩn cho Web (React / JavaScript)
+## 5. BẢNG MÃ LỖI HTTP & CÁCH XỬ LÝ (ERROR HANDLING)
 
-```javascript
-// src/services/nurseryApi.js
-const BACKEND_URL = "https://pepper-nursery-iot.onrender.com/api/v1";
-const DEVICE_ID = "esp32-nursery-01";
+| Mã HTTP | Tên lỗi | Nguyên nhân phổ biến | Hướng khắc phục |
+| :---: | :--- | :--- | :--- |
+| **`200`** | OK | Yêu cầu truy vấn thành công | Dữ liệu trả về đầy đủ trong mảng `feeds`. |
+| **`201`** | Created | Thêm bản ghi mới thành công | Dữ liệu đã được lưu trữ vào MySQL Aiven. |
+| **`400`** | Bad Request | Dữ liệu yêu cầu không hợp lệ | Kiểm tra lại email hoặc thông tin gửi lên. |
+| **`401`** | Unauthorized | Thiếu header `X-API-Key` hoặc JWT token hết hạn | Kiểm tra lại khóa 16 ký tự trong header. |
+| **`403`** | Forbidden | Dùng nhầm Write Key để đọc dữ liệu (hoặc ngược lại) | Cung cấp đúng **Read API Key** cho web đọc dữ liệu. |
+| **`404`** | Not Found | `channel_id` không tồn tại | Kiểm tra lại số ID kênh trong đường dẫn URL. |
+| **`422`** | Unprocessable | Sai định dạng ngày (`YYYY-MM-DD`), giờ (`HH:MM`) hoặc `start > end` | Chuẩn hóa định dạng thời gian trước khi gọi. |
+| **`500`** | Internal Error| Lỗi hệ thống server hoặc cơ sở dữ liệu Aiven | Thử lại sau ít phút hoặc kiểm tra backend logs. |
 
-export const nurseryApi = {
-  // 1. Đọc số đo thời gian thực mới nhất (kèm lời khuyên chăm sóc)
-  async getLatest() {
-    const res = await fetch(`${BACKEND_URL}/devices/${DEVICE_ID}/readings/latest`);
-    if (!res.ok) throw new Error(`Lỗi tải số đo: ${res.status}`);
-    return await res.json();
-  },
-
-  // 2. Đọc 20 số đo lịch sử để vẽ đồ thị
-  async getHistory(limit = 20) {
-    const res = await fetch(`${BACKEND_URL}/devices/${DEVICE_ID}/readings?limit=${limit}`);
-    if (!res.ok) throw new Error(`Lỗi tải lịch sử: ${res.status}`);
-    return await res.json();
-  },
-
-  // 3. Đăng nhập Admin
-  async login(username, password) {
-    const res = await fetch(`${BACKEND_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
-    if (!res.ok) throw new Error("Sai tên đăng nhập hoặc mật khẩu");
-    return await res.json();
-  },
-
-  // 4. Lấy danh sách quy tắc chăm sóc
-  async getRules() {
-    const res = await fetch(`${BACKEND_URL}/rules`);
-    if (!res.ok) throw new Error("Không thể tải danh sách quy tắc");
-    return await res.json();
-  },
-
-  // 5. Thêm quy tắc mới (Chỉ Admin)
-  async createRule(ruleData, token) {
-    const res = await fetch(`${BACKEND_URL}/rules`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(ruleData)
-    });
-    if (!res.ok) throw new Error("Không thể tạo quy tắc mới");
-    return await res.json();
-  }
-};
-```
