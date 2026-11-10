@@ -23,6 +23,9 @@ export const config = {
   },
   staleThresholdMinutes: parseInt(process.env.STALE_THRESHOLD_MINUTES || '5', 10),
 
+  // Whether to persist raw sensor telemetry into MySQL readings table (can be disabled since Bridge stores history)
+  saveReadingsToDb: process.env.SAVE_READINGS_TO_DB !== 'false',
+
   // Telemetry Ingestion Provider ('sensor_bridge' or 'thingspeak')
   telemetryProvider: (process.env.TELEMETRY_PROVIDER || 'sensor_bridge') as 'sensor_bridge' | 'thingspeak',
 
