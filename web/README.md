@@ -36,7 +36,7 @@ Dashboard cung cấp giao diện trực quan, hiện đại, theo dõi toàn di�
 ```text
 web/
 ├── index.html                   # HTML template của Vite (nạp Inter font & JetBrains Mono)
-├── vite.config.js               # Cấu hình Vite dev server (port 3000, proxy /api)
+├── vite.config.js               # Cấu hình Vite dev server (port 5173, proxy /api)
 ├── package.json                 # Lệnh scripts: dev, build, test, test:integration
 ├── README.md                    # Tài liệu hướng dẫn sử dụng và bàn giao
 ├── src/
@@ -83,7 +83,7 @@ npm install
 npm run dev
 # hoặc: npm start
 ```
-Mở trình duyệt truy cập: **`http://localhost:3000`**
+Mở trình duyệt truy cập: **`http://localhost:5173`**
 
 ### 3.3. Đóng gói sản phẩm (Production Build)
 ```bash
