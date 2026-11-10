@@ -27,8 +27,8 @@ export const APP_CONFIG = {
   // Base URL của Backend chính thức trên Render (Cloud)
   apiBaseUrl: BACKEND_URL,
 
-  // Chu kỳ tự động làm mới từ API thật (10 giây)
-  autoRefreshIntervalMs: 10000,
+  // Chu kỳ tự động làm mới từ API thật (3 giây)
+  autoRefreshIntervalMs: 3000,
 
   // Ngưỡng thời gian đánh dấu dữ liệu cũ (5 phút theo docs/contracts/api.md)
   staleThresholdMinutes: 5,
