@@ -1,5 +1,5 @@
 name: pepper_nursery_mobile
-description: "Mobile application for Pepper Nursery IoT MVP (G0 v0.1)"
+description: "End-user accounts, devices and sensor monitoring for Pepper Nursery IoT"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -13,6 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   intl: ^0.20.3
+  flutter_secure_storage: ^11.2.0
 
 dev_dependencies:
   flutter_test:
@@ -22,5 +23,3 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/fixtures/

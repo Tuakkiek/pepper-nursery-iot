@@ -6,10 +6,11 @@ export const LoginSchema = z.object({
 });
 
 export const RegisterSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  full_name: z.string().min(1, 'Full name is required'),
-  role: z.enum(['admin', 'user']).optional().default('user'),
+  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(64),
+  password: z.string().min(6, 'Password must be at least 6 characters')
+    .refine(value => Buffer.byteLength(value, 'utf8') <= 72, 'Password must not exceed 72 UTF-8 bytes'),
+  full_name: z.string().trim().min(1, 'Full name is required').max(128),
+  role: z.literal('user').optional().default('user'),
 });
 
 export type LoginDto = z.infer<typeof LoginSchema>;

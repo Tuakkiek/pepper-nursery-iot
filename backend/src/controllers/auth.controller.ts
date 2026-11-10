@@ -102,15 +102,16 @@ export async function meHandler(req: Request, res: Response): Promise<void> {
 
   try {
     const user = await authService.getUserById(req.user.id);
+    if (!user) {
+      res.status(401).json({ error: { code: 'unauthorized', message: 'Account no longer exists' } });
+      return;
+    }
     res.status(200).json({
       status: 'ok',
-      user: user || req.user,
+      user,
     });
   } catch (err) {
-    res.status(200).json({
-      status: 'ok',
-      user: req.user,
-    });
+    res.status(500).json({ error: { code: 'server_error', message: 'Failed to load account' } });
   }
 }
 

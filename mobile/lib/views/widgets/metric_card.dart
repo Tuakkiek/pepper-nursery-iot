@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../../core/constants/app_colors.dart';
 
 enum MetricState {
-  normal,        // Mới, hợp lệ: teal.soft / brand.teal, text navy
-  uncalibrated,  // Chưa hiệu chuẩn: teal.soft / viền brand.teal, text navy
-  error,         // Lỗi cảm biến: coral.soft / brand.coral, text coral.strong
-  missing,       // Chưa có dữ liệu: surface / viền border, text textSecondary
+  normal, // Mới, hợp lệ: teal.soft / brand.teal, text navy
+  uncalibrated, // Chưa hiệu chuẩn: teal.soft / viền brand.teal, text navy
+  error, // Lỗi cảm biến: coral.soft / brand.coral, text coral.strong
+  missing, // Chưa có dữ liệu: surface / viền border, text textSecondary
 }
 
 class MetricCard extends StatelessWidget {
@@ -103,10 +104,7 @@ class MetricCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                displayValue ?? '—',
-                style: AppTypography.metricValue,
-              ),
+              Text(displayValue ?? '—', style: AppTypography.metricValue),
               if (displayValue != null && unit.isNotEmpty) ...[
                 const SizedBox(width: AppSpacing.space1),
                 Text(
@@ -124,7 +122,9 @@ class MetricCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.space2),
 
           // 3. Nhãn trạng thái
-          Row(
+          Wrap(
+            spacing: AppSpacing.space2,
+            runSpacing: AppSpacing.space2,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -138,13 +138,9 @@ class MetricCard extends StatelessWidget {
                 ),
               ),
               if (subtitle != null) ...[
-                const SizedBox(width: AppSpacing.space2),
-                Expanded(
-                  child: Text(
-                    subtitle!,
-                    style: AppTypography.caption.copyWith(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  subtitle!,
+                  style: AppTypography.caption.copyWith(fontSize: 12),
                 ),
               ],
             ],
@@ -156,7 +152,7 @@ class MetricCard extends StatelessWidget {
             Text(
               timestamp!,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
             ),

@@ -54,8 +54,8 @@ constexpr unsigned long READ_INTERVAL_MS = 2500; // DHT22 đọc cách nhau >= 2
 
 // =============== WIFI CONFIGURATION ===============
 
-const char* WIFI_SSID = "Redmi Note 11";
-const char* WIFI_PASSWORD = "Ngoc0706@";
+const char* WIFI_SSID = "Nha Tro 116";
+const char* WIFI_PASSWORD = "0932650165";
 
 // =============== SENSOR DATA BRIDGE CONFIGURATION ===============
 // Channel 1 cần cấu hình field1 ... field8 và một Write API Key còn hiệu lực.

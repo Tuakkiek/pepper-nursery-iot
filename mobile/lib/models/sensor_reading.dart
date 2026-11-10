@@ -76,6 +76,11 @@ class ReadingData {
   });
 
   factory ReadingData.fromJson(Map<String, dynamic> json) {
+    final status = SensorStatus.fromJson(
+      json['sensor_status'] as Map<String, dynamic>?,
+    );
+    double? value(String key, String sensor) =>
+        sensor == 'ok' ? (json[key] as num?)?.toDouble() : null;
     return ReadingData(
       schemaVersion: json['schema_version'] as String? ?? '0.1',
       deviceId: json['device_id'] as String? ?? '',
@@ -83,15 +88,15 @@ class ReadingData {
       recordedAt: json['recorded_at'] != null
           ? DateTime.tryParse(json['recorded_at'] as String)
           : null,
-      airTemperatureC: (json['air_temperature_c'] as num?)?.toDouble(),
-      airHumidityPct: (json['air_humidity_pct'] as num?)?.toDouble(),
-      soilTemperatureC: (json['soil_temperature_c'] as num?)?.toDouble(),
+      airTemperatureC: value('air_temperature_c', status.dht22),
+      airHumidityPct: value('air_humidity_pct', status.dht22),
+      soilTemperatureC: value('soil_temperature_c', status.ds18b20),
       soilMoistureRaw: (json['soil_moisture_raw'] as num?)?.toInt(),
-      soilMoisturePct: (json['soil_moisture_pct'] as num?)?.toDouble(),
+      soilMoisturePct: value('soil_moisture_pct', status.hd38),
       waterTdsAdcRaw: (json['water_tds_adc_raw'] as num?)?.toInt(),
-      waterTdsPpm: (json['water_tds_ppm'] as num?)?.toDouble(),
+      waterTdsPpm: value('water_tds_ppm', status.tds),
       waterPhAdcRaw: (json['water_ph_adc_raw'] as num?)?.toInt(),
-      waterPh: (json['water_ph'] as num?)?.toDouble(),
+      waterPh: value('water_ph', status.ph4502c),
       sensorStatus: SensorStatus.fromJson(
         json['sensor_status'] as Map<String, dynamic>?,
       ),
@@ -105,6 +110,7 @@ class LatestReadingResponse {
   final DateTime? receivedAt;
   final bool? isStale;
   final String? adviceMessage;
+  final String? adviceStatus;
 
   const LatestReadingResponse({
     required this.deviceId,
@@ -112,6 +118,7 @@ class LatestReadingResponse {
     this.receivedAt,
     this.isStale,
     this.adviceMessage,
+    this.adviceStatus,
   });
 
   factory LatestReadingResponse.fromJson(Map<String, dynamic> json) {
@@ -133,6 +140,9 @@ class LatestReadingResponse {
           : null,
       isStale: json['is_stale'] as bool?,
       adviceMessage: message,
+      adviceStatus: adviceVal is Map<String, dynamic>
+          ? adviceVal['status'] as String?
+          : null,
     );
   }
 }
@@ -141,10 +151,7 @@ class HistoryItem {
   final ReadingData reading;
   final DateTime? receivedAt;
 
-  const HistoryItem({
-    required this.reading,
-    this.receivedAt,
-  });
+  const HistoryItem({required this.reading, this.receivedAt});
 
   factory HistoryItem.fromJson(Map<String, dynamic> json) {
     final readingJson = (json['reading'] as Map<String, dynamic>?) ?? json;

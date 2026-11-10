@@ -1,82 +1,64 @@
-# Ứng Dụng Mobile — Pepper Nursery IoT (MVP G0 v0.1)
+# Vườn ươm của tôi — mobile người dùng cuối
 
-Ứng dụng Flutter di động theo dõi và hỗ trợ chăm sóc cây ớt con trong vườn ươm IoT (phụ trách bởi thành viên **QThang** theo hợp đồng `docs/members/QThang/06_QThang_Ung_dung_Mobile.md`).
+Flutter app dùng API backend của dự án. Luồng: đăng ký tài khoản → chưa có thiết bị → nhập device ID trong hộp → xem số đo/lịch sử → gỡ thiết bị khi cần. Một tài khoản có nhiều thiết bị; mỗi thiết bị có một chủ.
 
----
+UI dùng nền kem `#F7F8F3`, navy `#002C3E`, teal `#78BCC4`, màu cảnh báo theo [Design System](../Design_System_Web_Mobile.md). Ba mục chính: Tổng quan, Lịch sử, Thiết bị; tài khoản và đăng xuất ở góc trên.
 
-## 1. Yêu cầu môi trường
+## Chạy ứng dụng
 
-- **Flutter SDK**: `>= 3.13.0` (đã kiểm tra tương thích với Flutter `3.47.9` / Dart `3.13.7`).
-- **Nền tảng hỗ trợ**:
-  - **Chrome (Web)**: Chạy thử nhanh (`flutter run -d chrome`).
-  - **Android**: Thiết bị thật hoặc máy ảo qua ADB (`flutter run -d android`).
-  - **Windows Desktop**: (`flutter run -d windows`).
+Đã kiểm tra với Flutter 3.47.9 / Dart 3.13.7. Cần backend có các thay đổi sở hữu thiết bị trong [hợp đồng API](../docs/contracts/api.md).
 
----
-
-## 2. Kết nối Backend (Phase 2 & Phase 3)
-
-Mặc định ứng dụng kết nối trực tiếp với Backend Cloud của dự án triển khai trên Render:
-**`https://pepper-nursery-iot.onrender.com`**
-
-### Cấu hình địa chỉ gọi API:
-* **Mặc định (Cloud Render)**: `https://pepper-nursery-iot.onrender.com` (chạy được trên mọi môi trường: Android máy thật, Emulator, Chrome Web, Windows Desktop).
-* **Phát triển nội bộ (Localhost)**: `http://localhost:8000` (khi chạy backend máy thật với Chrome/Desktop).
-* **Trình giả lập Android Emulator kết nối Localhost**: `http://10.0.2.2:8000`.
-
-### Các Endpoint Backend đã tích hợp:
-1. **Kiểm tra trạng thái máy chủ (Health Check)**:
-   * `GET /api/v1/health`
-2. **Số đo mới nhất (Tự động cập nhật mỗi 3s)**:
-   * `GET /api/v1/devices/{device_id}/readings/latest`
-   * Mặc định ứng dụng tự động thăm dò ngầm định kỳ mỗi **3 giây** để số đo luôn ở trạng thái mới nhất theo thời gian thực mà không làm giật/nháy giao diện.
-   * Hỗ trợ 3 thiết bị mẫu từ Backend:
-     - `esp32-nursery-01`: Trạm hoạt động bình thường, đồng bộ số đo thật.
-     - `esp32-stale-01`: Trạm mất tín hiệu > 5 phút (`is_stale: true`).
-     - `esp32-empty-01`: Trạm mới chưa có dữ liệu (`reading: null`).
-3. **Lịch sử số đo**:
-   * `GET /api/v1/devices/{device_id}/readings?limit=20`
-4. **Quy tắc chăm sóc hệ thống**:
-   * `GET /api/v1/rules`: Tải danh sách quy tắc chăm sóc động từ CSDL MySQL trên Aiven.
-5. **Đồng bộ ThingSpeak tức thì**:
-   * `POST /api/v1/sync/thingspeak`: Gọi API đồng bộ các feed mới nhất từ ThingSpeak Channel `3543608`.
-6. **Xác thực & Phân quyền (JWT)**:
-   * `POST /api/v1/auth/login`: Hỗ trợ tài khoản `admin` / `admin123` hoặc `user` / `user123`.
-
----
-
-## 3. Chuyển đổi giữa Backend Live, Tự động làm mới và Dữ liệu mẫu (Fixture G0)
-
-Nhấn vào biểu tượng **Cài đặt (biểu tượng thanh gạt `Tune` trên góc AppBar)** để:
-- Chuyển đổi giữa chế độ **Backend thật (API Live)** và **Dữ liệu mẫu (Fixture G0)**.
-- Bật/tắt chế độ **Tự động cập nhật dữ liệu** và thay đổi chu kỳ làm mới (mặc định **3s**, hỗ trợ 5s, 10s).
-- Có thể bật/tắt nhanh chế độ tự động làm mới bằng nút biểu tượng **Sync** ngay trên thanh AppBar.
-- Đổi địa chỉ Base URL hoặc chọn nhanh (Cloud Render / Localhost / Android Emulator).
-- Nút **Kiểm tra kết nối (Ping Health)** kiểm tra trực tiếp máy chủ có phản hồi hay không.
-- Bấm **Đồng bộ ngay** để ép đồng bộ ThingSpeak.
-- Đăng nhập / Đăng xuất tài khoản quản trị viên.
-
----
-
-## 4. Chạy và Kiểm thử
-
-Di chuyển vào thư mục `mobile`:
-```bash
+```powershell
 cd mobile
 flutter pub get
-```
-
-### Chạy ứng dụng:
-```bash
-# Trên Chrome
+# Backend Render mặc định
 flutter run -d chrome
-
-# Trên Android
-flutter run -d android
+# Backend local, chạy trên Chrome
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000
+# Android Emulator kết nối backend trên máy phát triển
+flutter run -d <emulator-id> --dart-define=API_BASE_URL=http://10.0.2.2:8000
+# Android máy thật: dùng IP LAN của máy chạy backend hoặc URL HTTPS đã triển khai
+flutter run -d <device-id> --dart-define=API_BASE_URL=https://your-backend.example
 ```
 
-### Chạy toàn bộ bộ kiểm thử tự động (12 ca kiểm thử):
-```bash
+`API_BASE_URL` nhận URL gốc hoặc URL kết thúc bằng `/api/v1`. Mặc định: `https://pepper-nursery-iot.onrender.com`. Đổi cấu hình cần chạy/build lại. Android chỉ mở HTTP local trong build debug; bản release dùng HTTPS.
+
+Thiết bị phải được backend cấp trước. `device_id` là khóa chính, không phải tên gợi nhớ. Với bridge hiện tại, dùng channel ID như `1`. Không nhập ID bất kỳ rồi mong hệ thống tạo phần cứng mới. Đăng ký tài khoản không cần ID thiết bị.
+
+## API sử dụng
+
+| Chức năng | Endpoint dưới `/api/v1` |
+| --- | --- |
+| Đăng ký / đăng nhập / xác minh phiên | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
+| Danh sách / thêm thiết bị | `GET /user/devices`, `POST /user/devices` |
+| Đổi tên / gỡ liên kết | `PATCH /user/devices/:id`, `DELETE /user/devices/:id` |
+| Chọn thiết bị | `PUT /user/devices/:id/active` |
+| Số đo / lịch sử | `GET /devices/:id/readings/latest`, `GET /devices/:id/readings?limit=20` |
+
+Mọi API thiết bị gửi Bearer JWT. Phiên được lưu bằng [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage); 401 xóa phiên và trở về đăng nhập. Web preview dùng HTTPS hoặc localhost cho secure storage. Có cấu hình Keychain cho iOS; build iOS cần macOS/Xcode.
+
+Ứng dụng này chỉ dành cho tài khoản người dùng cá nhân. Tài khoản `admin` không thể đăng nhập hoặc khôi phục phiên trong mobile.
+
+Số đo làm mới mỗi 10 giây khi app hoạt động. Null hiện `—`, số 0 vẫn hiện đúng; cảm biến chưa hiệu chuẩn chỉ hiện số đọc thô. Độ mới và nhận định chăm sóc lấy từ backend. Không có fallback mẫu hay gọi Sensor Data Bridge trực tiếp. Fixture chỉ còn dùng trong kiểm thử parser.
+
+## Cấu trúc
+
+- `lib/services/api_service.dart`: HTTP, cấu hình URL, JWT header, lỗi tiếng Việt.
+- `lib/services/session_store.dart`: lưu/xóa JWT trong kho an toàn của nền tảng.
+- `lib/controllers/app_controller.dart`: phiên, danh sách/thiết bị đang chọn, polling, loại bỏ response cũ.
+- `lib/models/`: kiểu dữ liệu API.
+- `lib/views/screens/`: đăng nhập/đăng ký, tổng quan, thiết bị, lịch sử.
+- `lib/core/constants/`: màu, spacing, typography và theme theo Design System.
+
+## Kiểm thử và build
+
+```powershell
 flutter analyze
 flutter test
+flutter build web
+flutter build apk --debug
+# Xuất ảnh UI để review (tùy chọn, đường dẫn font theo máy)
+flutter test test/visual_review_test.dart --dart-define=QA_FONT_PATH=C:/Windows/Fonts/segoeui.ttf
 ```
+
+Test mobile dùng HTTP mock và fixture trong thư mục test, không tạo tài khoản trên Render. Suite backend dùng HTTP + MySQL thật riêng: xem [các phase và hướng dẫn nghiệm thu](../docs/mobile/end-user-phases.md). Ảnh QA nằm trong `build/qa/`, APK debug nếu build thành công ở `build/app/outputs/flutter-apk/app-debug.apk`.

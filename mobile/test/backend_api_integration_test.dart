@@ -2,25 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pepper_nursery_mobile/models/auth_user.dart';
 import 'package:pepper_nursery_mobile/models/care_rule.dart';
 import 'package:pepper_nursery_mobile/models/sensor_reading.dart';
-import 'package:pepper_nursery_mobile/services/api_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late ApiService apiService;
-
-  setUp(() {
-    apiService = ApiService();
-    apiService.mode = DataSourceMode.live;
-    apiService.baseUrl = ApiService.defaultCloudUrl;
-    apiService.deviceId = 'esp32-nursery-01';
-  });
-
-  test('Kiểm tra cấu hình mặc định kết nối Backend Cloud Render', () {
-    expect(apiService.baseUrl, equals('https://pepper-nursery-iot.onrender.com'));
-    expect(apiService.deviceId, 'esp32-nursery-01');
-    expect(apiService.mode, DataSourceMode.live);
-  });
-
   test('Phân tích phản hồi Rule từ Backend (/api/v1/rules)', () {
     final ruleJson = {
       'id': 1,
@@ -173,48 +157,4 @@ void main() {
     expect(history.readings.length, 2);
     expect(history.readings[0].reading.sampleId, 'ts-entry-442');
   });
-
-  test('Kiểm tra chế độ Fixture Auth và Sync ThingSpeak khi không có mạng', () async {
-    apiService.mode = DataSourceMode.fixture;
-
-    // Đăng nhập fixture
-    final user = await apiService.login('admin', 'admin123');
-    expect(user.username, 'admin');
-    expect(apiService.isAuthenticated, isTrue);
-
-    // Đồng bộ fixture
-    final syncRes = await apiService.triggerThingSpeakSync();
-    expect(syncRes['status'], 'ok');
-    expect(syncRes['fetched'], 10);
-
-    // Đăng xuất
-    apiService.logout();
-    expect(apiService.isAuthenticated, isFalse);
-  });
-
-  test('Kiểm tra cấu hình và chức năng tự động cập nhật dữ liệu mỗi 3s', () async {
-    // Mặc định tự động cập nhật là bật và chu kỳ là 3 giây
-    expect(apiService.autoRefresh, isTrue);
-    expect(apiService.refreshIntervalSeconds, equals(3));
-
-    // Đổi chu kỳ sang 5 giây
-    apiService.refreshIntervalSeconds = 5;
-    expect(apiService.refreshIntervalSeconds, equals(5));
-
-    // Chuyển sang Fixture và gọi pollLatestReading
-    apiService.mode = DataSourceMode.fixture;
-    apiService.currentScenario = FixtureScenario.normal;
-
-    final polled = await apiService.pollLatestReading();
-    expect(polled, isNotNull);
-    expect(apiService.latestReading, isNotNull);
-    expect(apiService.latestReading!.deviceId, equals('esp32-nursery-01'));
-    expect(apiService.lastRefreshedAt, isNotNull);
-
-    // Bật / tắt autoRefresh
-    apiService.autoRefresh = false;
-    expect(apiService.autoRefresh, isFalse);
-    apiService.stopAutoRefresh();
-  });
 }
-

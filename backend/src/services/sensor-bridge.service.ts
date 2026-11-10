@@ -295,25 +295,13 @@ readingService.setFallbackGetters(
   (deviceId: string) => {
     const cached = sensorBridgeService.getCachedLatestReading();
     if (!cached) return null;
-    if (
-      cached.device_id === deviceId ||
-      deviceId === '1' ||
-      deviceId === 'esp32-nursery-01' ||
-      deviceId === 'me'
-    ) {
+    if (cached.device_id === deviceId) {
       return cached;
     }
     return null;
   },
   (deviceId: string, limit: number, options?: any) => {
     const items = sensorBridgeService.getCachedHistory(limit, options);
-    if (
-      deviceId === '1' ||
-      deviceId === 'esp32-nursery-01' ||
-      deviceId === 'me'
-    ) {
-      return items;
-    }
     return items.filter((i) => i.reading.device_id === deviceId);
   }
 );

@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { deviceOwnershipService } from './device-ownership.service';
 import jwt from 'jsonwebtoken';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { pool } from '../db/connection';
@@ -31,7 +32,7 @@ export class AuthService {
 
   async register(dto: RegisterDto): Promise<{ user: AuthUser; token: string }> {
     const passwordHash = await this.hashPassword(dto.password);
-    const role = dto.role || 'user';
+    const role = 'user';
 
     const [res] = await pool.query<ResultSetHeader>(
       `INSERT INTO users (username, password_hash, full_name, role)
@@ -124,42 +125,8 @@ export class AuthService {
     userId: number,
     deviceIdOrName: string
   ): Promise<AuthUser | null> {
-    const rawInput = String(deviceIdOrName).trim();
-    if (!rawInput) return null;
-
-    // 1. Find device by device_id OR name
-    let [devRows] = await pool.query<RowDataPacket[]>(
-      `SELECT device_id, name, description FROM devices WHERE device_id = ? OR name = ? LIMIT 1`,
-      [rawInput, rawInput]
-    );
-
-    let device: { device_id: string; name: string; description: string | null };
-
-    if (devRows.length > 0) {
-      device = devRows[0] as any;
-    } else {
-      // Auto-register device if not found (e.g. newly entered channel id or name from bridge)
-      const newDeviceId = rawInput;
-      const newDeviceName = rawInput === '1' ? 'esp32-nursery-01' : `Trạm ${rawInput}`;
-      await pool.query(
-        `INSERT INTO devices (device_id, name, description)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE name = VALUES(name)`,
-        [newDeviceId, newDeviceName, `Thiết bị liên kết từ API read (${rawInput})`]
-      );
-      device = {
-        device_id: newDeviceId,
-        name: newDeviceName,
-        description: `Thiết bị liên kết từ API read (${rawInput})`,
-      };
-    }
-
-    // 2. Update user's selected_device_id
-    await pool.query(
-      `UPDATE users SET selected_device_id = ? WHERE id = ?`,
-      [device.device_id, userId]
-    );
-
+    const result = await deviceOwnershipService.setActive(userId, deviceIdOrName);
+    if (result.status !== 'ok') return null;
     return this.getUserById(userId);
   }
 }

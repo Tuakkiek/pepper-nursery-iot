@@ -71,7 +71,7 @@ export const apiService = {
     // Real API Call qua Backend TDat (Mục 1 & 4)
     const url = `${API_BASE_URL}/devices/${encodeURIComponent(deviceId)}/readings/latest`;
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { Authorization: `Bearer ${authService.getToken()}` } });
       const data = await res.json();
 
       if (!res.ok) {
@@ -116,7 +116,7 @@ export const apiService = {
 
     const url = `${API_BASE_URL}/devices/${encodeURIComponent(deviceId)}/readings?limit=${limit}`;
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { Authorization: `Bearer ${authService.getToken()}` } });
       const data = await res.json();
 
       if (!res.ok) {

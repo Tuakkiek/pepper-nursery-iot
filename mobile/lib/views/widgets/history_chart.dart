@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../core/constants/app_colors.dart';
 
 class ChartDataPoint {
@@ -78,8 +79,9 @@ class _HistoryChartState extends State<HistoryChart> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Text(
                 '${widget.title} (${widget.unit})',
@@ -89,7 +91,8 @@ class _HistoryChartState extends State<HistoryChart> {
                   color: AppColors.navy,
                 ),
               ),
-              if (_selectedIndex != null && _selectedIndex! < widget.points.length) ...[
+              if (_selectedIndex != null &&
+                  _selectedIndex! < widget.points.length) ...[
                 Text(
                   widget.points[_selectedIndex!].value != null
                       ? '${widget.points[_selectedIndex!].value!.toStringAsFixed(1)} ${widget.unit}'
@@ -105,8 +108,12 @@ class _HistoryChartState extends State<HistoryChart> {
           ),
           if (_selectedIndex != null && _selectedIndex! < widget.points.length)
             Text(
-              DateFormat('HH:mm:ss dd/MM').format(widget.points[_selectedIndex!].time.toLocal()),
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              DateFormat('HH:mm:ss dd/MM')
+                  .format(widget.points[_selectedIndex!].time.toLocal()),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
             )
           else
             const Text(
@@ -119,8 +126,14 @@ class _HistoryChartState extends State<HistoryChart> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return GestureDetector(
-                  onPanDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth),
-                  onPanUpdate: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth),
+                  onPanDown: (details) => _handleTouch(
+                    details.localPosition.dx,
+                    constraints.maxWidth,
+                  ),
+                  onPanUpdate: (details) => _handleTouch(
+                    details.localPosition.dx,
+                    constraints.maxWidth,
+                  ),
                   child: CustomPaint(
                     size: Size(constraints.maxWidth, 150),
                     painter: _ChartPainter(
@@ -141,7 +154,8 @@ class _HistoryChartState extends State<HistoryChart> {
 
   void _handleTouch(double dx, double width) {
     if (widget.points.isEmpty) return;
-    final step = width / (widget.points.length > 1 ? widget.points.length - 1 : 1);
+    final step =
+        width / (widget.points.length > 1 ? widget.points.length - 1 : 1);
     int index = (dx / step).round().clamp(0, widget.points.length - 1);
     setState(() {
       _selectedIndex = index;
@@ -186,10 +200,20 @@ class _ChartPainter extends CustomPainter {
 
     // Draw horizontal guidelines (min, mid, max)
     canvas.drawLine(Offset(0, 0), Offset(size.width, 0), gridPaint);
-    canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), gridPaint);
-    canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height), gridPaint);
+    canvas.drawLine(
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
+      gridPaint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+      gridPaint,
+    );
 
-    final stepX = points.length > 1 ? size.width / (points.length - 1) : size.width / 2;
+    final stepX = points.length > 1
+        ? size.width / (points.length - 1)
+        : size.width / 2;
 
     // Không nối đường qua điểm không có dữ liệu (null/lỗi)
     Offset? lastPoint;
@@ -204,7 +228,8 @@ class _ChartPainter extends CustomPainter {
       }
 
       final normalizedY = (val - minVal) / (maxVal - minVal);
-      final y = size.height - (normalizedY * size.height).clamp(0.0, size.height);
+      final y =
+          size.height - (normalizedY * size.height).clamp(0.0, size.height);
       final currentPoint = Offset(x, y);
 
       if (lastPoint != null) {
@@ -213,7 +238,11 @@ class _ChartPainter extends CustomPainter {
 
       // Draw dot
       final isSelected = selectedIndex == i;
-      canvas.drawCircle(currentPoint, isSelected ? 6.0 : 4.0, isSelected ? activeDotPaint : dotPaint);
+      canvas.drawCircle(
+        currentPoint,
+        isSelected ? 6.0 : 4.0,
+        isSelected ? activeDotPaint : dotPaint,
+      );
 
       lastPoint = currentPoint;
     }
@@ -221,7 +250,7 @@ class _ChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ChartPainter oldDelegate) {
-    return oldDelegate.points != points || oldDelegate.selectedIndex != selectedIndex;
+    return oldDelegate.points != points ||
+        oldDelegate.selectedIndex != selectedIndex;
   }
 }
-

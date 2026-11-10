@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/sensor_reading.dart';
 import '../../services/api_service.dart';
@@ -20,8 +21,15 @@ enum MetricFilter {
 
 class HistoryScreen extends StatefulWidget {
   final ApiService apiService;
+  final String deviceId;
+  final String deviceName;
 
-  const HistoryScreen({super.key, required this.apiService});
+  const HistoryScreen({
+    super.key,
+    required this.apiService,
+    required this.deviceId,
+    required this.deviceName,
+  });
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -37,28 +45,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     _loadHistory();
-    widget.apiService.addListener(_onServiceChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.apiService.removeListener(_onServiceChanged);
-    super.dispose();
-  }
-
-  void _onServiceChanged() {
-    _loadHistory();
   }
 
   Future<void> _loadHistory() async {
-    if (!mounted) return;
+    if (!mounted || _isLoading) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final list = await widget.apiService.fetchHistory();
+      final list = await widget.apiService.fetchHistory(widget.deviceId);
       if (!mounted) return;
       setState(() {
         _history = list;
@@ -83,180 +80,195 @@ class _HistoryScreenState extends State<HistoryScreen> {
     // Để vẽ biểu đồ từ trái sang phải, ta đảo ngược danh sách theo thời gian tăng dần
     final chronological = _history.reversed.toList();
 
-    return chronological.map((item) {
-      final time = item.reading.recordedAt ?? item.receivedAt ?? DateTime.now();
-      double? val;
+    return chronological
+        .where(
+          (item) => item.reading.recordedAt != null || item.receivedAt != null,
+        )
+        .map((item) {
+          final time = item.reading.recordedAt ?? item.receivedAt!;
+          double? val;
 
-      switch (_selectedFilter) {
-        case MetricFilter.airTemp:
-          val = item.reading.airTemperatureC;
-          break;
-        case MetricFilter.airHumidity:
-          val = item.reading.airHumidityPct;
-          break;
-        case MetricFilter.soilTemp:
-          val = item.reading.soilTemperatureC;
-          break;
-        case MetricFilter.soilMoisture:
-          val = item.reading.soilMoisturePct;
-          break;
-        case MetricFilter.tds:
-          val = item.reading.waterTdsPpm;
-          break;
-        case MetricFilter.ph:
-          val = item.reading.waterPh;
-          break;
-      }
+          switch (_selectedFilter) {
+            case MetricFilter.airTemp:
+              val = item.reading.airTemperatureC;
+              break;
+            case MetricFilter.airHumidity:
+              val = item.reading.airHumidityPct;
+              break;
+            case MetricFilter.soilTemp:
+              val = item.reading.soilTemperatureC;
+              break;
+            case MetricFilter.soilMoisture:
+              val = item.reading.soilMoisturePct;
+              break;
+            case MetricFilter.tds:
+              val = item.reading.waterTdsPpm;
+              break;
+            case MetricFilter.ph:
+              val = item.reading.waterPh;
+              break;
+          }
 
-      return ChartDataPoint(
-        time: time,
-        value: val,
-        label: _selectedFilter.label,
-      );
-    }).toList();
+          return ChartDataPoint(
+            time: time,
+            value: val,
+            label: _selectedFilter.label,
+          );
+        })
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lịch Sử Số Đo'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Làm mới',
-            onPressed: _isLoading ? null : _loadHistory,
+    return RefreshIndicator(
+      onRefresh: _loadHistory,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(AppSpacing.space4),
+        children: [
+          Text(widget.deviceName, style: AppTypography.sectionTitle),
+          Text('Device ID: ${widget.deviceId}', style: AppTypography.caption),
+          const Text(
+            'Thời gian hiển thị theo múi giờ của điện thoại.',
+            style: AppTypography.caption,
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadHistory,
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.space4),
-          children: [
-            // Bộ lọc chọn đại lượng biểu đồ
-            const Text(
-              'Chọn đại lượng xem biểu đồ:',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _isLoading ? null : _loadHistory,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Làm mới'),
             ),
-            const SizedBox(height: AppSpacing.space2),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: MetricFilter.values.map((filter) {
-                  final isSelected = _selectedFilter == filter;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ChoiceChip(
-                      label: Text('${filter.label} (${filter.unit})'),
-                      selected: isSelected,
-                      selectedColor: AppColors.tealSoft,
-                      backgroundColor: AppColors.surface,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? AppColors.navy : AppColors.textSecondary,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.control),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.teal : AppColors.border,
-                        ),
-                      ),
-                      onSelected: (selected) {
-                        if (selected) setState(() => _selectedFilter = filter);
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
+          ),
+          // Bộ lọc chọn đại lượng biểu đồ
+          const Text(
+            'Chọn đại lượng xem biểu đồ:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
             ),
-            const SizedBox(height: AppSpacing.space4),
-
-            if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(color: AppColors.navy),
-                ),
-              )
-            else if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.space4),
-                decoration: BoxDecoration(
-                  color: AppColors.coralSoft,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: AppColors.coral),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.error_outline, color: AppColors.coralStrong, size: 32),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Không tải được lịch sử: $_errorMessage',
-                      style: const TextStyle(color: AppColors.coralStrong),
-                      textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.space2),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: MetricFilter.values.map((filter) {
+                final isSelected = _selectedFilter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ChoiceChip(
+                    label: Text('${filter.label} (${filter.unit})'),
+                    selected: isSelected,
+                    selectedColor: AppColors.tealSoft,
+                    backgroundColor: AppColors.surface,
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppColors.navy
+                          : AppColors.textSecondary,
                     ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.navy,
-                        foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                      side: BorderSide(
+                        color: isSelected ? AppColors.teal : AppColors.border,
                       ),
-                      onPressed: _loadHistory,
-                      child: const Text('Thử lại'),
                     ),
-                  ],
-                ),
-              )
-            else ...[
-              // Biểu đồ cho đại lượng đã chọn
-              HistoryChart(
-                title: _selectedFilter.label,
-                unit: _selectedFilter.unit,
-                points: _getChartPoints(),
-              ),
-              const SizedBox(height: AppSpacing.space6),
-
-              // Danh sách bản ghi gần đây
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Các bản ghi gần nhất',
-                    style: AppTypography.sectionTitle,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _selectedFilter = filter);
+                    },
                   ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.space4),
+
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40.0),
+                child: CircularProgressIndicator(color: AppColors.navy),
+              ),
+            )
+          else if (_errorMessage != null)
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.space4),
+              decoration: BoxDecoration(
+                color: AppColors.coralSoft,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.coral),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.coralStrong,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
                   Text(
-                    '${_history.length} bản ghi',
-                    style: AppTypography.caption,
+                    'Không tải được lịch sử: $_errorMessage',
+                    style: const TextStyle(color: AppColors.coralStrong),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.navy,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _loadHistory,
+                    child: const Text('Thử lại'),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.space3),
+            )
+          else ...[
+            // Biểu đồ cho đại lượng đã chọn
+            HistoryChart(
+              title: _selectedFilter.label,
+              unit: _selectedFilter.unit,
+              points: _getChartPoints(),
+            ),
+            const SizedBox(height: AppSpacing.space6),
 
-              if (_history.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.space6),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Text(
-                    'Chưa có bản ghi lịch sử nào',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                )
-              else
-                ..._history.map((item) => _buildHistoryRow(item)),
-            ],
+            // Danh sách bản ghi gần đây
+            Wrap(
+              spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text(
+                  'Các bản ghi gần nhất',
+                  style: AppTypography.sectionTitle,
+                ),
+                Text(
+                  '${_history.length} bản ghi',
+                  style: AppTypography.caption,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.space3),
+
+            if (_history.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.space6),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Text(
+                  'Chưa có bản ghi lịch sử nào',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              )
+            else
+              ..._history.map((item) => _buildHistoryRow(item)),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -278,8 +290,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Text(
                 'Mẫu: ${reading.sampleId}',
@@ -303,26 +316,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
             spacing: 16,
             runSpacing: 8,
             children: [
-              _metricChip('Khí', reading.airTemperatureC != null ? '${reading.airTemperatureC!.toStringAsFixed(1)}°C' : '—'),
-              _metricChip('Ẩm khí', reading.airHumidityPct != null ? '${reading.airHumidityPct!.toStringAsFixed(1)}%' : '—'),
-              _metricChip('Đất', reading.soilTemperatureC != null ? '${reading.soilTemperatureC!.toStringAsFixed(1)}°C' : '—'),
+              _metricChip(
+                'Khí',
+                reading.airTemperatureC != null
+                    ? '${reading.airTemperatureC!.toStringAsFixed(1)}°C'
+                    : '—',
+              ),
+              _metricChip(
+                'Ẩm khí',
+                reading.airHumidityPct != null
+                    ? '${reading.airHumidityPct!.toStringAsFixed(1)}%'
+                    : '—',
+              ),
+              _metricChip(
+                'Đất',
+                reading.soilTemperatureC != null
+                    ? '${reading.soilTemperatureC!.toStringAsFixed(1)}°C'
+                    : '—',
+              ),
               _metricChip(
                 'Ẩm đất',
                 reading.soilMoisturePct != null
                     ? '${reading.soilMoisturePct!.toStringAsFixed(1)}%'
-                    : (reading.soilMoistureRaw != null ? 'Raw: ${reading.soilMoistureRaw}' : '—'),
+                    : (reading.soilMoistureRaw != null
+                          ? 'Raw: ${reading.soilMoistureRaw}'
+                          : '—'),
               ),
               _metricChip(
                 'TDS',
                 reading.waterTdsPpm != null
                     ? '${reading.waterTdsPpm!.toStringAsFixed(1)} ppm'
-                    : (reading.waterTdsAdcRaw != null ? 'Raw: ${reading.waterTdsAdcRaw}' : '—'),
+                    : (reading.waterTdsAdcRaw != null
+                          ? 'Raw: ${reading.waterTdsAdcRaw}'
+                          : '—'),
               ),
               _metricChip(
                 'pH',
                 reading.waterPh != null
                     ? '${reading.waterPh!.toStringAsFixed(1)} pH'
-                    : (reading.waterPhAdcRaw != null ? 'Raw: ${reading.waterPhAdcRaw}' : '—'),
+                    : (reading.waterPhAdcRaw != null
+                          ? 'Raw: ${reading.waterPhAdcRaw}'
+                          : '—'),
               ),
             ],
           ),
@@ -337,10 +371,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
         Text(
           value,

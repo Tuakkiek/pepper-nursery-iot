@@ -4,7 +4,7 @@ import { readingService } from '../services/reading.service';
 function resolveRequestedDeviceId(req: Request): string {
   const param = req.params.device_id as string;
   if (param === 'me') {
-    return req.user?.selected_device_id || '1';
+    throw new Error('Device access middleware must resolve the active device');
   }
   return param;
 }
@@ -107,10 +107,10 @@ export async function claimUserDeviceHandler(req: Request, res: Response): Promi
     return;
   }
 
-  const deviceInput = req.body.device_id || req.body.id || req.body.name;
-  const customName = req.body.custom_name || (req.body.name !== deviceInput ? req.body.name : undefined);
+  const deviceInput = req.body.device_id;
+  const customName = req.body.custom_name;
 
-  if (!deviceInput) {
+  if ((typeof deviceInput !== 'string' && typeof deviceInput !== 'number') || !String(deviceInput).trim() || String(deviceInput).trim().length > 64 || (customName !== undefined && (typeof customName !== 'string' || customName.trim().length > 128))) {
     res.status(400).json({
       error: { code: 'missing_device_id', message: 'Field device_id (mã trên thiết bị) is required' },
     });
@@ -126,8 +126,8 @@ export async function claimUserDeviceHandler(req: Request, res: Response): Promi
       return;
     }
     if (result.status === 'not_found') {
-      res.status(400).json({
-        error: { code: 'invalid_device', message: result.message },
+      res.status(404).json({
+        error: { code: 'device_not_found', message: result.message },
       });
       return;
     }
@@ -174,7 +174,7 @@ export async function updateUserDeviceNameHandler(req: Request, res: Response): 
   const deviceId = req.params.device_id;
   const newName = req.body.name || req.body.custom_name;
 
-  if (!newName) {
+  if (typeof newName !== 'string' || !newName.trim() || newName.trim().length > 128) {
     res.status(400).json({
       error: { code: 'missing_name', message: 'Tên hiển thị mới không được để trống' },
     });

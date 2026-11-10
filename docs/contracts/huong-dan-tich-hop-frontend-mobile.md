@@ -20,6 +20,8 @@ Dành cho DKhoa và QThang khi cần tra cứu các tài liệu API trong repo:
 
 ---
 
+> Cập nhật 11/11/2026: phần luồng tài khoản trong [api.md](api.md#luồng-người-dùng-cuối-mobile) là hợp đồng hiện hành. Mobile chỉ gọi backend dự án. Nhận thiết bị dùng **device ID chính xác**, không dùng tên; mã không tồn tại trả 404, không tự tạo thiết bị. Tất cả API đọc thiết bị/số đo yêu cầu JWT và kiểm tra chủ sở hữu. Các ví dụ cũ dưới đây cần đọc theo các quy tắc này.
+
 ## 2. Địa chỉ Máy chủ (Base URL) & Hạ tầng Kết nối
 
 * **Backend TDat Production (Render):** `https://pepper-nursery-iot.onrender.com/api/v1`
