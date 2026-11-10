@@ -47,6 +47,18 @@ export class SensorBridgeService {
   private totalSynced = 0;
   private lastError: string | null = null;
 
+  // In-memory cache of latest readings from Bridge (bypasses DB if saveReadingsToDb = false)
+  private cachedLatestReading: IngestReadingDto | null = null;
+  private cachedHistory: { reading: IngestReadingDto; received_at: string }[] = [];
+
+  getCachedLatestReading(): IngestReadingDto | null {
+    return this.cachedLatestReading;
+  }
+
+  getCachedHistory(limit = 20): { reading: IngestReadingDto; received_at: string }[] {
+    return this.cachedHistory.slice(0, limit);
+  }
+
   getStatus() {
     const sb = config.sensorBridge;
     return {
@@ -149,18 +161,37 @@ export class SensorBridgeService {
       const data = (await res.json()) as BridgeFeedListResponse;
       const feeds = data.feeds || [];
 
+      const nowIso = new Date().toISOString();
+      const items: { reading: IngestReadingDto; received_at: string }[] = [];
+
       for (const feed of feeds) {
         if (feed.id) {
           this.lastEntryId = Math.max(this.lastEntryId || 0, feed.id);
         }
         const dto = this.mapFeedToDto(feed, sb.deviceId);
-        const result = await readingService.ingestReading(dto);
-        if (result.status === 'created') {
+        const itemReceivedAt = dto.recorded_at || nowIso;
+        items.push({ reading: dto, received_at: itemReceivedAt });
+
+        if (config.saveReadingsToDb) {
+          const result = await readingService.ingestReading(dto);
+          if (result.status === 'created') {
+            created++;
+            this.totalSynced++;
+          } else if (result.status === 'duplicate') {
+            duplicates++;
+          }
+        } else {
+          // Bypassing DB storage for raw telemetry, saving to in-memory cache
           created++;
           this.totalSynced++;
-        } else if (result.status === 'duplicate') {
-          duplicates++;
         }
+      }
+
+      // Update in-memory caches (sorted newest first)
+      if (items.length > 0) {
+        items.sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
+        this.cachedLatestReading = items[0].reading;
+        this.cachedHistory = items;
       }
 
       this.lastSyncAt = new Date().toISOString();
@@ -225,4 +256,16 @@ export class SensorBridgeService {
 }
 
 export const sensorBridgeService = new SensorBridgeService();
+
+// Register bridge cache fallback with readingService (enables zero-DB mode when saveReadingsToDb is false)
+readingService.setFallbackGetters(
+  (deviceId: string) => {
+    const cached = sensorBridgeService.getCachedLatestReading();
+    return cached && cached.device_id === deviceId ? cached : null;
+  },
+  (deviceId: string, limit: number) => {
+    const items = sensorBridgeService.getCachedHistory(limit);
+    return items.filter((i) => i.reading.device_id === deviceId);
+  }
+);
 
