@@ -5,7 +5,7 @@
 * **Mục tiêu:** Đánh giá tính ổn định, độ tin cậy và khả năng tự phục hồi của Backend khi đối mặt với sự cố mạng, trễ dữ liệu, mất kết nối phần cứng và truy cập đồng thời.
 * **Môi trường thử nghiệm:**
   - **Hệ thống CSDL:** MySQL 8.4 Aiven Cloud (SSL bắt buộc, Connection Pool tối đa 10 kết nối đồng thời).
-  - **Gateway trung gian:** ThingSpeak Cloud Channel `3543608`.
+  - **Gateway trung gian:** Sensor Data Bridge (`https://sensor-data-bridge-frontened.onrender.com`, API: `https://sensor-data-bridge-backend.onrender.com`, Channel 1, Read Key: `sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw`).
   - **Máy chủ Backend:** Node.js 20 LTS chạy trên container Linux (Render Cloud & Local Host).
 
 ---
@@ -15,10 +15,10 @@
 ### 1.1. Kịch bản 1: Mất kết nối Wi-Fi tại vườn ươm & Phục hồi mạng
 * **Mô tả tình huống:** Trạm ESP32 tại vườn ươm bị mất kết nối Wi-Fi trong 15 phút, sau đó tự động tái kết nối và tiếp tục gửi dữ liệu.
 * **Cơ chế xử lý của Backend:**
-  - Trong thời gian trạm mất liên lạc: `ThingSpeakService` tiếp tục polling định kỳ 20 giây nhưng không phát hiện feed mới (`lastEntryId` không đổi). CSDL không sinh bản ghi giả.
+  - Trong thời gian trạm mất liên lạc: `SensorBridgeService` tiếp tục polling định kỳ 20 giây nhưng không phát hiện feed mới (`lastEntryId` không đổi). CSDL không sinh bản ghi giả.
   - Trên Web/Mobile: Do khoảng cách thời gian giữa thời điểm hiện tại và `recorded_at` của bản ghi cuối vượt quá 5 phút, cờ `is_stale` tự động chuyển sang `true`.
   - Phản hồi `advice`: Backend lập tức chuyển trạng thái sang `insufficient_data` (hoặc `advice: null` theo an toàn G0) với khuyến cáo: *"Dữ liệu từ thiết bị đã cũ quá 5 phút hoặc trạm mất liên lạc. Hệ thống tạm dừng đưa ra lời khuyên chăm sóc để tránh nhận định sai lệch."*
-  - Khi có mạng trở lại: ESP32 đẩy các feed mới lên ThingSpeak, Worker tự động phát hiện `entry_id` mới, cập nhật bản ghi vào CSDL, cờ `is_stale` chuyển ngay về `false`, hệ thống trở lại giám sát thời gian thực bình thường mà không cần khởi động lại server.
+  - Khi có mạng trở lại: ESP32 đẩy các feed mới lên Sensor Data Bridge, Worker tự động phát hiện `entry_id` mới, cập nhật bản ghi vào CSDL, cờ `is_stale` chuyển ngay về `false`, hệ thống trở lại giám sát thời gian thực bình thường mà không cần khởi động lại server.
 * **Kết luận:** **ĐẠT (Hệ thống không bị treo, tự phục hồi hoàn toàn).**
 
 ### 1.2. Kịch bản 2: Cơ chế Chống trùng lặp Dữ liệu (Deduplication & Idempotency)

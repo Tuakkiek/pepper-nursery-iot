@@ -1,6 +1,6 @@
 # 04 — TDat: Backend, API và cơ sở dữ liệu
 
-**Phạm vi dự án:** Backend nhận và phân phối dữ liệu 5 cảm biến theo `docs/contracts/sensor-reading.md` và `docs/contracts/api.md`. Hệ thống tiếp nhận dữ liệu từ trạm vườn ươm thông qua kênh **ThingSpeak Channel 3543608** (do QTien vận hành) kết hợp cổng **REST API Ingest dự phòng**. Backend là nơi duy nhất lưu trữ CSDL tập trung trên MySQL Aiven Cloud, tính toán quy tắc nông học chăm sóc cây ớt theo chuẩn của MThuy (`docs/agronomy/quy-tac-cham-soc-v0.1.md`), cung cấp xác thực JWT 2 vai trò (`admin`, `user`) và cung cấp API RESTful cho Web Dashboard (DKhoa) và Mobile App (QThang).
+**Phạm vi dự án:** Backend nhận và phân phối dữ liệu 5 cảm biến theo `docs/contracts/sensor-reading.md` và `docs/contracts/api.md`. Hệ thống tiếp nhận dữ liệu từ trạm vườn ươm thông qua cổng chuyển tiếp **Sensor Data Bridge** (`https://sensor-data-bridge-frontened.onrender.com`, API: `https://sensor-data-bridge-backend.onrender.com`, Channel 1, Read API Key: `sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw`) cùng cổng **REST API Ingest dự phòng** và kênh **ThingSpeak** (dự phòng). Backend là nơi duy nhất lưu trữ CSDL tập trung trên MySQL Aiven Cloud, tính toán quy tắc nông học chăm sóc cây ớt theo chuẩn của MThuy (`docs/agronomy/quy-tac-cham-soc-v0.1.md`), cung cấp xác thực JWT 2 vai trò (`admin`, `user`) và cung cấp API RESTful cho Web Dashboard (DKhoa) và Mobile App (QThang).
 
 **Dự án:** MVP chăm sóc vườn ươm ớt con bằng IoT (`pepper-nursery-iot`)  
 **Người phụ trách chính:** TDat  
@@ -18,14 +18,15 @@
 
 Một backend hoàn chỉnh viết bằng **TypeScript / Node.js (Express)** kết nối **MySQL 8.4 (Aiven Cloud)**:
 1. **Thu thập dữ liệu đa kênh:**
-   - **ThingSpeak Sync Worker:** Polling tự động mỗi 20 giây từ ThingSpeak Channel `3543608` (Read Key: `EB9BC5UY233Z23O4`), chuẩn hóa múi giờ UTC, ánh xạ 8 fields thành payload chuẩn và lưu trữ vào bảng `readings`.
+   - **Sensor Data Bridge Sync Worker:** Polling tự động mỗi 20 giây từ Sensor Data Bridge Channel `1` (Read Key: `sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw`), chuẩn hóa múi giờ UTC, ánh xạ 8 fields thành payload chuẩn và lưu trữ an toàn vào bảng `readings`.
+   - **ThingSpeak Sync Worker (Fallback):** Hỗ trợ dự phòng kênh ThingSpeak Channel `3543608`.
    - **REST Ingest Endpoint:** `POST /api/v1/readings` hỗ trợ kiểm tra nghiêm ngặt bằng Zod schema, deduplication theo cặp `(device_id, sample_id)` và chống xung đột payload bằng hàm băm SHA-256 (`payload_hash`).
 2. **Cung cấp API cho Web và Mobile:**
    - `GET /api/v1/health`: Trạng thái máy chủ và kết nối cơ sở dữ liệu.
    - `GET /api/v1/devices/:device_id/readings/latest`: Lấy số đo mới nhất kèm cờ `is_stale` (ngưỡng 5 phút) và lời khuyên chăm sóc sinh học `advice`.
    - `GET /api/v1/devices/:device_id/readings?limit=20`: Truy vấn lịch sử số đo phục vụ vẽ biểu đồ quan trắc.
-   - `GET /api/v1/sync/thingspeak/status`: Giám sát trạng thái kênh ThingSpeak và worker polling.
-   - `POST /api/v1/sync/thingspeak`: Kích hoạt đồng bộ thủ công tức thời.
+   - `GET /api/v1/sync/bridge/status`: Giám sát trạng thái kênh Sensor Data Bridge và worker polling (kèm alias `/api/v1/sync/thingspeak/status`).
+   - `POST /api/v1/sync/bridge`: Kích hoạt đồng bộ thủ công tức thời (kèm alias `/api/v1/sync/thingspeak`).
 3. **Bảo mật và Phân quyền (Auth JWT):**
    - Hỗ trợ 2 vai trò: `admin` (Quản trị viên) và `user` (Kỹ thuật viên vườn ươm).
    - `POST /api/v1/auth/login`: Xác thực tài khoản, cấp JWT token (thời hạn 24h).
