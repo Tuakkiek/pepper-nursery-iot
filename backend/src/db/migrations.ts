@@ -47,9 +47,23 @@ export async function runMigrations(): Promise<void> {
         password_hash VARCHAR(255) NOT NULL,
         full_name VARCHAR(128) NOT NULL,
         role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
-        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+        selected_device_id VARCHAR(64) NULL,
+        created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_users_selected_device (selected_device_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Ensure selected_device_id column exists if table already existed
+    const [userColumns] = await conn.query<any[]>(
+      "SHOW COLUMNS FROM users LIKE 'selected_device_id'"
+    );
+    if (!userColumns || userColumns.length === 0) {
+      await conn.query(`
+        ALTER TABLE users
+        ADD COLUMN selected_device_id VARCHAR(64) NULL AFTER role,
+        ADD INDEX idx_users_selected_device (selected_device_id);
+      `);
+    }
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS care_rules (

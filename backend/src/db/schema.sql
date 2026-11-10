@@ -37,7 +37,10 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(128) NOT NULL,
   role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  selected_device_id VARCHAR(64) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT fk_users_selected_device FOREIGN KEY (selected_device_id) REFERENCES devices(device_id) ON DELETE SET NULL,
+  INDEX idx_users_selected_device (selected_device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS care_rules (

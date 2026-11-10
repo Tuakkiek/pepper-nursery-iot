@@ -9,6 +9,7 @@ import { sensorBridgeService } from '../services/sensor-bridge.service';
 export const apiRouter = Router();
 
 apiRouter.use('/auth', authRouter);
+apiRouter.use('/users', authRouter);
 apiRouter.use('/rules', ruleRouter);
 apiRouter.use('/readings', readingRouter);
 apiRouter.use('/devices', deviceRouter);

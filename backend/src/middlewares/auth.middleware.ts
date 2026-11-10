@@ -7,6 +7,12 @@ export interface AuthUser {
   username: string;
   role: 'admin' | 'user';
   full_name: string;
+  selected_device_id?: string | null;
+  device?: {
+    device_id: string;
+    name: string;
+    description: string | null;
+  } | null;
 }
 
 declare global {
