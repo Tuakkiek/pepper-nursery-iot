@@ -42,10 +42,14 @@ STALE_THRESHOLD_MINUTES=5
 # Telemetry Provider ('sensor_bridge' or 'thingspeak')
 TELEMETRY_PROVIDER=sensor_bridge
 
+# =========================================================================
 # Sensor Data Bridge (Cổng trung gian Cloud Render)
+# Khi API read key thay đổi, bạn chỉ cần cập nhật trường API_READ này:
+# =========================================================================
+API_READ=sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw
+
 SENSOR_BRIDGE_ENABLED=true
 SENSOR_BRIDGE_URL=https://sensor-data-bridge-frontened.onrender.com
-SENSOR_BRIDGE_READ_API_KEY=sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw
 SENSOR_BRIDGE_CHANNEL_ID=1
 SENSOR_BRIDGE_DEVICE_ID=esp32-nursery-01
 SENSOR_BRIDGE_POLL_INTERVAL_MS=20000

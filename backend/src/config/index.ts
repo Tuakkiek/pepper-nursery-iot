@@ -32,7 +32,12 @@ export const config = {
     baseUrl: resolveBridgeUrl(process.env.SENSOR_BRIDGE_URL),
     frontendUrl: 'https://sensor-data-bridge-frontened.onrender.com',
     docsUrl: 'https://sensor-data-bridge-backend.onrender.com/docs',
-    readApiKey: process.env.SENSOR_BRIDGE_READ_API_KEY || 'sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw',
+    readApiKey: (
+      process.env.API_READ ||
+      process.env.API_READ_KEY ||
+      process.env.SENSOR_BRIDGE_READ_API_KEY ||
+      'sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw'
+    ).trim(),
     channelId: parseInt(process.env.SENSOR_BRIDGE_CHANNEL_ID || '1', 10),
     deviceId: process.env.SENSOR_BRIDGE_DEVICE_ID || 'esp32-nursery-01',
     pollIntervalMs: parseInt(process.env.SENSOR_BRIDGE_POLL_INTERVAL_MS || '20000', 10),
