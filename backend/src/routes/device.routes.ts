@@ -3,6 +3,7 @@ import {
   listDevicesHandler,
   getDeviceDetailHandler,
   createDeviceHandler,
+  deleteDeviceHandler,
   getLatestReadingHandler,
   getHistoryReadingsHandler,
   getRangeReadingsHandler,
@@ -28,6 +29,9 @@ deviceRouter.get('/', listDevicesHandler);
 
 // POST /api/v1/devices (Register/add a new device by ID & Name)
 deviceRouter.post('/', createDeviceHandler);
+
+// DELETE /api/v1/devices/:device_id (Delete a device and its readings)
+deviceRouter.delete('/:device_id', deleteDeviceHandler);
 
 // GET /api/v1/devices/:device_id/readings/latest (supports :device_id = '1', 'esp32-nursery-01', or 'me')
 deviceRouter.get('/:device_id/readings/latest', getLatestReadingHandler);

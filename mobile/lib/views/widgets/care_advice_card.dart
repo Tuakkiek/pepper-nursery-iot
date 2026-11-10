@@ -73,28 +73,47 @@ class CareAdviceCard extends StatelessWidget {
 
     // Nếu có lời khuyên chăm sóc được backend trả về
     if (advice != null && advice.isNotEmpty) {
+      final isDangerOrWarning = latestData?.adviceStatus == 'danger' ||
+          latestData?.adviceStatus == 'warning' ||
+          latestData?.adviceStatus == 'insufficient_data';
+      final suggestedAction = latestData?.suggestedAction;
+      final hasDistinctAction = suggestedAction != null &&
+          suggestedAction.isNotEmpty &&
+          !advice.contains(suggestedAction);
+
       return Container(
         decoration: BoxDecoration(
-          color: AppColors.tealSoft,
+          color: isDangerOrWarning ? AppColors.coralSoft : AppColors.tealSoft,
           borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: AppColors.teal, width: 1.0),
+          border: Border.all(
+            color: isDangerOrWarning ? AppColors.coral : AppColors.teal,
+            width: 1.0,
+          ),
         ),
         padding: const EdgeInsets.all(AppSpacing.space4),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.eco, color: AppColors.navy, size: 22),
+            Icon(
+              isDangerOrWarning ? Icons.warning_amber_rounded : Icons.eco,
+              color: isDangerOrWarning ? AppColors.coralStrong : AppColors.navy,
+              size: 22,
+            ),
             const SizedBox(width: AppSpacing.space3),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Khuyến nghị chăm sóc (Đã duyệt)',
+                  Text(
+                    isDangerOrWarning
+                        ? 'Cảnh báo chăm sóc từ Backend'
+                        : 'Khuyến nghị chăm sóc (Đã duyệt)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.navy,
+                      color: isDangerOrWarning
+                          ? AppColors.coralStrong
+                          : AppColors.navy,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.space1),
@@ -106,6 +125,18 @@ class CareAdviceCard extends StatelessWidget {
                       color: AppColors.navy,
                     ),
                   ),
+                  if (hasDistinctAction) ...[
+                    const SizedBox(height: AppSpacing.space1),
+                    Text(
+                      'Hành động gợi ý: $suggestedAction',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        height: 17 / 12,
+                        color: AppColors.navy,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -18,12 +18,14 @@ class HistoryChart extends StatefulWidget {
   final String title;
   final String unit;
   final List<ChartDataPoint> points;
+  final int decimals;
 
   const HistoryChart({
     super.key,
     required this.title,
     required this.unit,
     required this.points,
+    this.decimals = 1,
   });
 
   @override
@@ -32,6 +34,15 @@ class HistoryChart extends StatefulWidget {
 
 class _HistoryChartState extends State<HistoryChart> {
   int? _selectedIndex;
+
+  @override
+  void didUpdateWidget(covariant HistoryChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.title != widget.title ||
+        (_selectedIndex != null && _selectedIndex! >= widget.points.length)) {
+      _selectedIndex = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +103,7 @@ class _HistoryChartState extends State<HistoryChart> {
               if (_selectedIndex != null && _selectedIndex! < widget.points.length) ...[
                 Text(
                   widget.points[_selectedIndex!].value != null
-                      ? '${widget.points[_selectedIndex!].value!.toStringAsFixed(1)} ${widget.unit}'
+                      ? '${widget.points[_selectedIndex!].value!.toStringAsFixed(widget.decimals)} ${widget.unit}'
                       : '—',
                   style: const TextStyle(
                     fontSize: 13,

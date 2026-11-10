@@ -22,10 +22,12 @@ class _CareScreenState extends State<CareScreen> {
   List<CareRule> _rules = [];
   bool _isLoadingRules = false;
   String? _rulesError;
+  String? _lastRulesSourceKey;
 
   @override
   void initState() {
     super.initState();
+    _lastRulesSourceKey = widget.apiService.rulesSourceKey;
     _loadRules();
     widget.apiService.addListener(_onServiceChanged);
   }
@@ -37,7 +39,15 @@ class _CareScreenState extends State<CareScreen> {
   }
 
   void _onServiceChanged() {
-    _loadRules();
+    if (!mounted) return;
+    final nextKey = widget.apiService.rulesSourceKey;
+    if (_lastRulesSourceKey != null && nextKey != _lastRulesSourceKey) {
+      _lastRulesSourceKey = nextKey;
+      _loadRules();
+    } else {
+      _lastRulesSourceKey = nextKey;
+      setState(() {});
+    }
   }
 
   Future<void> _loadRules() async {
@@ -65,9 +75,21 @@ class _CareScreenState extends State<CareScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final reading = widget.latestData?.reading;
-    final isStale = widget.latestData?.isStale;
-    final advice = widget.latestData?.adviceMessage;
+    final effectiveLatest = widget.apiService.latestReading ?? widget.latestData;
+    final reading = effectiveLatest?.reading;
+    final isStale = effectiveLatest?.isStale;
+    final advice = effectiveLatest?.adviceMessage;
+    final adviceStatus = effectiveLatest?.adviceStatus;
+    final suggestedAction = effectiveLatest?.suggestedAction;
+    final isAdviceWarning = adviceStatus == 'danger' ||
+        adviceStatus == 'warning' ||
+        adviceStatus == 'insufficient_data';
+    final displayAdvice = (suggestedAction != null &&
+            suggestedAction.isNotEmpty &&
+            advice != null &&
+            !advice.contains(suggestedAction))
+        ? '$advice\nHành động gợi ý: $suggestedAction'
+        : advice;
 
     return Scaffold(
       appBar: AppBar(
@@ -86,7 +108,7 @@ class _CareScreenState extends State<CareScreen> {
           padding: const EdgeInsets.all(AppSpacing.space4),
           children: [
             // 1. Banner trạng thái nhận định hiện tại
-            if (widget.latestData == null || reading == null) ...[
+            if (effectiveLatest == null || reading == null) ...[
               _buildInfoCard(
                 title: 'Chưa có dữ liệu cảm biến',
                 message: 'Không đủ dữ liệu để đưa ra nhận định hoặc khuyến nghị tưới/chăm sóc.',
@@ -98,11 +120,13 @@ class _CareScreenState extends State<CareScreen> {
                 message: 'Thiết bị mất liên lạc quá 5 phút. Quy tắc chăm sóc không áp dụng cho số đo đã cũ.',
                 isWarning: true,
               ),
-            ] else if (advice != null && advice.isNotEmpty) ...[
+            ] else if (displayAdvice != null && displayAdvice.isNotEmpty) ...[
               _buildInfoCard(
-                title: 'Khuyến nghị hiện tại từ Backend',
-                message: advice,
-                isWarning: false,
+                title: isAdviceWarning
+                    ? 'Cảnh báo chăm sóc từ Backend'
+                    : 'Khuyến nghị hiện tại từ Backend',
+                message: displayAdvice,
+                isWarning: isAdviceWarning,
               ),
             ] else ...[
               _buildInfoCard(

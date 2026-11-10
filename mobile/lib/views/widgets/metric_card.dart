@@ -17,6 +17,7 @@ class MetricCard extends StatelessWidget {
   final IconData icon;
   final String? subtitle;
   final String? timestamp;
+  final VoidCallback? onTap;
 
   const MetricCard({
     super.key,
@@ -28,6 +29,7 @@ class MetricCard extends StatelessWidget {
     required this.icon,
     this.subtitle,
     this.timestamp,
+    this.onTap,
   });
 
   @override
@@ -59,14 +61,19 @@ class MetricCard extends StatelessWidget {
         break;
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: border,
-      ),
-      padding: const EdgeInsets.all(AppSpacing.space4),
-      child: Column(
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: border,
+          ),
+          padding: const EdgeInsets.all(AppSpacing.space4),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. Tên số đo + icon
@@ -162,6 +169,8 @@ class MetricCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+        ),
       ),
     );
   }

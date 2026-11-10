@@ -42,6 +42,21 @@ class SensorStatus {
   bool get isPhNotCalibrated => ph4502c == 'not_calibrated';
 }
 
+double? _toDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
+int? _toInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
 class ReadingData {
   final String schemaVersion;
   final String deviceId;
@@ -77,21 +92,21 @@ class ReadingData {
 
   factory ReadingData.fromJson(Map<String, dynamic> json) {
     return ReadingData(
-      schemaVersion: json['schema_version'] as String? ?? '0.1',
-      deviceId: json['device_id'] as String? ?? '',
-      sampleId: json['sample_id'] as String? ?? '',
+      schemaVersion: json['schema_version']?.toString() ?? '0.1',
+      deviceId: json['device_id']?.toString() ?? '',
+      sampleId: json['sample_id']?.toString() ?? '',
       recordedAt: json['recorded_at'] != null
           ? DateTime.tryParse(json['recorded_at'] as String)
           : null,
-      airTemperatureC: (json['air_temperature_c'] as num?)?.toDouble(),
-      airHumidityPct: (json['air_humidity_pct'] as num?)?.toDouble(),
-      soilTemperatureC: (json['soil_temperature_c'] as num?)?.toDouble(),
-      soilMoistureRaw: (json['soil_moisture_raw'] as num?)?.toInt(),
-      soilMoisturePct: (json['soil_moisture_pct'] as num?)?.toDouble(),
-      waterTdsAdcRaw: (json['water_tds_adc_raw'] as num?)?.toInt(),
-      waterTdsPpm: (json['water_tds_ppm'] as num?)?.toDouble(),
-      waterPhAdcRaw: (json['water_ph_adc_raw'] as num?)?.toInt(),
-      waterPh: (json['water_ph'] as num?)?.toDouble(),
+      airTemperatureC: _toDouble(json['air_temperature_c']),
+      airHumidityPct: _toDouble(json['air_humidity_pct']),
+      soilTemperatureC: _toDouble(json['soil_temperature_c']),
+      soilMoistureRaw: _toInt(json['soil_moisture_raw']),
+      soilMoisturePct: _toDouble(json['soil_moisture_pct']),
+      waterTdsAdcRaw: _toInt(json['water_tds_adc_raw']),
+      waterTdsPpm: _toDouble(json['water_tds_ppm']),
+      waterPhAdcRaw: _toInt(json['water_ph_adc_raw']),
+      waterPh: _toDouble(json['water_ph']),
       sensorStatus: SensorStatus.fromJson(
         json['sensor_status'] as Map<String, dynamic>?,
       ),
@@ -101,30 +116,41 @@ class ReadingData {
 
 class LatestReadingResponse {
   final String deviceId;
+  final String? deviceName;
   final ReadingData? reading;
   final DateTime? receivedAt;
   final bool? isStale;
   final String? adviceMessage;
+  final String? adviceStatus;
+  final String? suggestedAction;
 
   const LatestReadingResponse({
     required this.deviceId,
+    this.deviceName,
     this.reading,
     this.receivedAt,
     this.isStale,
     this.adviceMessage,
+    this.adviceStatus,
+    this.suggestedAction,
   });
 
   factory LatestReadingResponse.fromJson(Map<String, dynamic> json) {
     String? message;
+    String? adviceStatus;
+    String? suggestedAction;
     final adviceVal = json['advice'];
     if (adviceVal is String) {
       message = adviceVal;
     } else if (adviceVal is Map<String, dynamic>) {
       message = adviceVal['message'] as String?;
+      adviceStatus = adviceVal['status'] as String?;
+      suggestedAction = adviceVal['suggested_action'] as String?;
     }
 
     return LatestReadingResponse(
-      deviceId: json['device_id'] as String? ?? '',
+      deviceId: json['device_id']?.toString() ?? '',
+      deviceName: json['name'] as String?,
       reading: json['reading'] != null
           ? ReadingData.fromJson(json['reading'] as Map<String, dynamic>)
           : null,
@@ -133,6 +159,8 @@ class LatestReadingResponse {
           : null,
       isStale: json['is_stale'] as bool?,
       adviceMessage: message,
+      adviceStatus: adviceStatus,
+      suggestedAction: suggestedAction,
     );
   }
 }
@@ -171,8 +199,46 @@ class HistoryResponse {
   factory HistoryResponse.fromJson(Map<String, dynamic> json) {
     final list = (json['readings'] as List<dynamic>?) ?? [];
     return HistoryResponse(
-      deviceId: json['device_id'] as String? ?? '',
-      limit: (json['limit'] as num?)?.toInt() ?? 20,
+      deviceId: json['device_id']?.toString() ?? '',
+      limit: _toInt(json['limit']) ?? 20,
+      readings: list
+          .map((item) => HistoryItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class RangeReadingsResponse {
+  final String deviceId;
+  final String startDate;
+  final String endDate;
+  final int total;
+  final int page;
+  final int pageSize;
+  final int totalPages;
+  final List<HistoryItem> readings;
+
+  const RangeReadingsResponse({
+    required this.deviceId,
+    required this.startDate,
+    required this.endDate,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+    required this.totalPages,
+    required this.readings,
+  });
+
+  factory RangeReadingsResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['readings'] as List<dynamic>?) ?? [];
+    return RangeReadingsResponse(
+      deviceId: json['device_id']?.toString() ?? '',
+      startDate: json['start_date']?.toString() ?? '',
+      endDate: json['end_date']?.toString() ?? '',
+      total: _toInt(json['total']) ?? list.length,
+      page: _toInt(json['page']) ?? 1,
+      pageSize: _toInt(json['page_size']) ?? 10,
+      totalPages: _toInt(json['total_pages']) ?? 1,
       readings: list
           .map((item) => HistoryItem.fromJson(item as Map<String, dynamic>))
           .toList(),

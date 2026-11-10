@@ -99,6 +99,42 @@ export async function createDeviceHandler(req: Request, res: Response): Promise<
   }
 }
 
+export async function deleteDeviceHandler(req: Request, res: Response): Promise<void> {
+  const deviceId = String(req.params.device_id || '').trim();
+  if (!deviceId) {
+    res.status(400).json({
+      error: {
+        code: 'missing_device_id',
+        message: 'Device ID is required',
+      },
+    });
+    return;
+  }
+
+  try {
+    const result = await readingService.deleteDevice(deviceId);
+    if (result.status === 'not_found') {
+      res.status(404).json({
+        error: {
+          code: 'device_not_found',
+          message: result.message,
+        },
+      });
+      return;
+    }
+
+    res.status(200).json(result);
+  } catch (err: any) {
+    console.error('Error deleting device:', err);
+    res.status(500).json({
+      error: {
+        code: 'server_error',
+        message: 'Failed to delete device',
+      },
+    });
+  }
+}
+
 export async function claimUserDeviceHandler(req: Request, res: Response): Promise<void> {
   if (!req.user) {
     res.status(401).json({

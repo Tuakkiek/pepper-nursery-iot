@@ -4,14 +4,22 @@ import '../../core/constants/app_colors.dart';
 import '../../models/sensor_reading.dart';
 import '../../services/api_service.dart';
 import '../widgets/care_advice_card.dart';
+import '../widgets/device_manager_sheet.dart';
 import '../widgets/device_status_card.dart';
 import '../widgets/metric_card.dart';
-import 'settings_sheet.dart';
+import '../widgets/reading_filter_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
+  final VoidCallback? onOpenLogin;
+  final VoidCallback? onLogout;
 
-  const DashboardScreen({super.key, required this.apiService});
+  const DashboardScreen({
+    super.key,
+    required this.apiService,
+    this.onOpenLogin,
+    this.onLogout,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -21,11 +29,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   LatestReadingResponse? _latestData;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _lastSourceKey;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _lastSourceKey = widget.apiService.sourceKey;
+    _latestData = widget.apiService.latestReading;
+    _loadData(isBackground: _latestData != null);
     widget.apiService.addListener(_onServiceChanged);
     widget.apiService.startAutoRefresh();
   }
@@ -38,15 +49,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _onServiceChanged() {
+    if (!mounted) return;
+    final nextKey = widget.apiService.sourceKey;
+    final sourceChanged = _lastSourceKey != null && nextKey != _lastSourceKey;
+    _lastSourceKey = nextKey;
+
     if (widget.apiService.latestReading != null) {
-      if (mounted) {
-        setState(() {
-          _latestData = widget.apiService.latestReading;
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _latestData = widget.apiService.latestReading;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } else if (sourceChanged) {
+      setState(() {
+        _latestData = null;
+        _errorMessage = null;
+      });
+      _loadData();
+    } else if (widget.apiService.autoRefreshError != null) {
+      setState(() {
+        if (_latestData == null) {
+          _errorMessage = widget.apiService.autoRefreshError;
+        }
+        _isLoading = false;
+      });
     } else {
-      _loadData(isBackground: true);
+      setState(() {});
     }
   }
 
@@ -78,12 +106,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _openSettings() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => SettingsSheet(apiService: widget.apiService),
+  void _openDeviceManager() {
+    showDeviceManagerSheet(context, apiService: widget.apiService);
+  }
+
+  void _openReadingDetails({
+    ReadingFieldFilter initialField = ReadingFieldFilter.all,
+  }) {
+    openReadingDetailsWithFilterPopup(
+      context,
+      widget.apiService,
+      initialField: initialField,
     );
   }
 
@@ -115,11 +148,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: 'Cài đặt kết nối backend',
-            onPressed: _openSettings,
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Làm mới ngay',
             onPressed: _isLoading ? null : () => _loadData(),
@@ -134,6 +162,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             vertical: AppSpacing.space3,
           ),
           children: [
+            if (widget.apiService.isAuthenticated || widget.onOpenLogin != null) ...[
+              _buildAccountBanner(),
+              const SizedBox(height: AppSpacing.space3),
+            ],
+
             // Thanh chuyển kịch bản nhanh cho Phase 1 (khi ở chế độ Fixture)
             if (isFixture) ...[
               _buildQuickScenarioSelector(),
@@ -143,11 +176,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Thẻ trạng thái thiết bị & độ mới dữ liệu
             DeviceStatusCard(
               latestData: _latestData,
+              configuredDeviceId: widget.apiService.deviceId,
+              configuredDeviceName: widget.apiService.activeDeviceName,
               isFixtureMode: isFixture,
               isBackendOnline: widget.apiService.isBackendOnline,
               autoRefreshEnabled: widget.apiService.autoRefresh,
               refreshIntervalSeconds: widget.apiService.refreshIntervalSeconds,
-              onConfigure: _openSettings,
+              syncError: widget.apiService.autoRefreshError,
+              onManageDevice: _openDeviceManager,
             ),
             const SizedBox(height: AppSpacing.space3),
 
@@ -170,6 +206,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildEmptyState(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAccountBanner() {
+    final user = widget.apiService.currentUser;
+    final isAuthenticated = widget.apiService.isAuthenticated && user != null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.space3,
+        vertical: AppSpacing.space2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isAuthenticated ? Icons.verified_user_outlined : Icons.person_outline,
+            size: 18,
+            color: AppColors.navy,
+          ),
+          const SizedBox(width: AppSpacing.space2),
+          Expanded(
+            child: isAuthenticated
+                ? Text(
+                    '${user.fullName} (${user.role.toUpperCase()})',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.navy,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : const Text(
+                    'Chế độ Khách (Chưa đăng nhập)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+          ),
+          const SizedBox(width: AppSpacing.space2),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: isAuthenticated ? AppColors.coralStrong : AppColors.navy,
+              minimumSize: const Size(44, 36),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space2),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            onPressed: isAuthenticated
+                ? () {
+                    widget.apiService.logout();
+                    widget.onLogout?.call();
+                  }
+                : widget.onOpenLogin,
+            child: Text(isAuthenticated ? 'Đăng xuất' : 'Đăng nhập'),
+          ),
+        ],
       ),
     );
   }
@@ -292,15 +394,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (isLive) ...[
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(minimumSize: const Size(110, 42)),
+                  onPressed: _openDeviceManager,
+                  child: const Text('Chọn / Thêm thiết bị'),
+                ),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size(110, 42)),
                   onPressed: () {
                     widget.apiService.mode = DataSourceMode.fixture;
                   },
                   child: const Text('Dùng dữ liệu mẫu (G0)'),
-                ),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(110, 42)),
-                  onPressed: _openSettings,
-                  child: const Text('Đổi IP Backend'),
                 ),
               ],
             ],
@@ -372,6 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icons.thermostat,
           subtitle: 'Cảm biến DHT22',
           timestamp: recordedAtStr,
+          onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.airTemp),
         ),
         const SizedBox(height: AppSpacing.space3),
 
@@ -385,19 +488,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icons.water_drop,
           subtitle: 'Cảm biến DHT22',
           timestamp: recordedAtStr,
+          onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.airHumidity),
         ),
         const SizedBox(height: AppSpacing.space3),
 
         // 3. Nhiệt độ đất (DS18B20)
         MetricCard(
           title: 'Nhiệt độ đất',
-          displayValue: reading.soilTemperatureC?.toStringAsFixed(1),
+          displayValue: reading.soilTemperatureC?.toStringAsFixed(2),
           unit: '°C',
           state: status.ds18b20 == 'ok' ? MetricState.normal : MetricState.error,
           statusText: status.ds18b20 == 'ok' ? 'Bình thường' : 'Lỗi cảm biến',
           icon: Icons.terrain,
           subtitle: 'Cảm biến DS18B20',
           timestamp: recordedAtStr,
+          onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.soilTemp),
         ),
         const SizedBox(height: AppSpacing.space3),
 
@@ -417,6 +522,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // 6. pH mẫu nước
         _buildPhMetricCard(reading, status.ph4502c, recordedAtStr),
+        const SizedBox(height: AppSpacing.space4),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          icon: const Icon(Icons.manage_search, size: 20),
+          onPressed: () => _openReadingDetails(),
+          label: const Text('Xem chi tiết & lọc theo ngày giờ'),
+        ),
         const SizedBox(height: AppSpacing.space6),
       ],
     );
@@ -433,6 +547,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.grass,
         subtitle: 'Số đọc thô ADC',
         timestamp: timestamp,
+        onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.soilMoisture),
       );
     }
 
@@ -446,6 +561,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       icon: Icons.grass,
       subtitle: 'Cảm biến HD-38',
       timestamp: timestamp,
+      onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.soilMoisture),
     );
   }
 
@@ -460,6 +576,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.opacity,
         subtitle: 'Số đọc thô ADC',
         timestamp: timestamp,
+        onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.tds),
       );
     }
 
@@ -473,6 +590,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       icon: Icons.opacity,
       subtitle: 'Cảm biến TDS Meter V1.0',
       timestamp: timestamp,
+      onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.tds),
     );
   }
 
@@ -487,19 +605,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: Icons.science,
         subtitle: 'Số đọc thô ADC',
         timestamp: timestamp,
+        onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.ph),
       );
     }
 
     final isOk = status == 'ok';
     return MetricCard(
       title: 'pH mẫu nước / dung dịch',
-      displayValue: reading.waterPh?.toStringAsFixed(1),
+      displayValue: reading.waterPh?.toStringAsFixed(2),
       unit: 'pH',
       state: isOk ? MetricState.normal : MetricState.error,
       statusText: isOk ? 'Bình thường' : 'Lỗi cảm biến',
       icon: Icons.science,
       subtitle: 'Cảm biến PH-4502C',
       timestamp: timestamp,
+      onTap: () => _openReadingDetails(initialField: ReadingFieldFilter.ph),
     );
   }
 }

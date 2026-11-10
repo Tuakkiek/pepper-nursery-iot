@@ -27,19 +27,20 @@ Mặc định ứng dụng kết nối trực tiếp với Backend Cloud của d
 ### Các Endpoint Backend đã tích hợp:
 1. **Kiểm tra trạng thái máy chủ (Health Check)**:
    * `GET /api/v1/health`
-2. **Số đo mới nhất (Tự động cập nhật mỗi 3s)**:
+2. **Số đo mới nhất (Tự động cập nhật mỗi 5s)**:
    * `GET /api/v1/devices/{device_id}/readings/latest`
-   * Mặc định ứng dụng tự động thăm dò ngầm định kỳ mỗi **3 giây** để số đo luôn ở trạng thái mới nhất theo thời gian thực mà không làm giật/nháy giao diện.
-   * Hỗ trợ 3 thiết bị mẫu từ Backend:
-     - `esp32-nursery-01`: Trạm hoạt động bình thường, đồng bộ số đo thật.
+   * Mặc định ứng dụng sử dụng `device_id = 1` (trạm thực tế ESP32 đồng bộ qua Sensor Data Bridge Channel 1) và tự động thăm dò ngầm định kỳ mỗi **5 giây** để số đo luôn ở trạng thái mới nhất theo thời gian thực mà không làm giật/nháy giao diện.
+   * Hỗ trợ chuyển đổi thiết bị từ Backend trong Cài đặt:
+     - `1`: Trạm thực tế ESP32 (Sensor Data Bridge Channel 1).
+     - `esp32-nursery-01`: Trạm kiểm thử cũ.
      - `esp32-stale-01`: Trạm mất tín hiệu > 5 phút (`is_stale: true`).
      - `esp32-empty-01`: Trạm mới chưa có dữ liệu (`reading: null`).
 3. **Lịch sử số đo**:
    * `GET /api/v1/devices/{device_id}/readings?limit=20`
 4. **Quy tắc chăm sóc hệ thống**:
    * `GET /api/v1/rules`: Tải danh sách quy tắc chăm sóc động từ CSDL MySQL trên Aiven.
-5. **Đồng bộ ThingSpeak tức thì**:
-   * `POST /api/v1/sync/thingspeak`: Gọi API đồng bộ các feed mới nhất từ ThingSpeak Channel `3543608`.
+5. **Đồng bộ Sensor Data Bridge tức thì**:
+   * `POST /api/v1/sync/bridge`: Gọi API đồng bộ các feed mới nhất từ Sensor Data Bridge Channel `1` (có fallback `/api/v1/sync/thingspeak`).
 6. **Xác thực & Phân quyền (JWT)**:
    * `POST /api/v1/auth/login`: Hỗ trợ tài khoản `admin` / `admin123` hoặc `user` / `user123`.
 
@@ -49,7 +50,7 @@ Mặc định ứng dụng kết nối trực tiếp với Backend Cloud của d
 
 Nhấn vào biểu tượng **Cài đặt (biểu tượng thanh gạt `Tune` trên góc AppBar)** để:
 - Chuyển đổi giữa chế độ **Backend thật (API Live)** và **Dữ liệu mẫu (Fixture G0)**.
-- Bật/tắt chế độ **Tự động cập nhật dữ liệu** và thay đổi chu kỳ làm mới (mặc định **3s**, hỗ trợ 5s, 10s).
+- Bật/tắt chế độ **Tự động cập nhật dữ liệu** và thay đổi chu kỳ làm mới (mặc định **5s**, hỗ trợ 3s, 10s).
 - Có thể bật/tắt nhanh chế độ tự động làm mới bằng nút biểu tượng **Sync** ngay trên thanh AppBar.
 - Đổi địa chỉ Base URL hoặc chọn nhanh (Cloud Render / Localhost / Android Emulator).
 - Nút **Kiểm tra kết nối (Ping Health)** kiểm tra trực tiếp máy chủ có phản hồi hay không.
