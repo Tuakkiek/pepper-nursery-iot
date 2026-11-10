@@ -100,9 +100,67 @@ export async function meHandler(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  res.status(200).json({
-    status: 'ok',
-    user: req.user,
-  });
+  try {
+    const user = await authService.getUserById(req.user.id);
+    res.status(200).json({
+      status: 'ok',
+      user: user || req.user,
+    });
+  } catch (err) {
+    res.status(200).json({
+      status: 'ok',
+      user: req.user,
+    });
+  }
+}
+
+export async function selectDeviceHandler(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({
+      error: {
+        code: 'unauthorized',
+        message: 'Authentication required to select device',
+      },
+    });
+    return;
+  }
+
+  const deviceInput = req.body.device_id || req.body.id || req.body.name;
+  if (!deviceInput) {
+    res.status(400).json({
+      error: {
+        code: 'missing_device_id',
+        message: 'Field device_id (or name/id) is required',
+      },
+    });
+    return;
+  }
+
+  try {
+    const updatedUser = await authService.selectUserDevice(req.user.id, String(deviceInput));
+    if (!updatedUser) {
+      res.status(404).json({
+        error: {
+          code: 'device_not_found',
+          message: `Device '${deviceInput}' could not be linked`,
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      status: 'ok',
+      message: 'Device selected successfully',
+      user: updatedUser,
+    });
+  } catch (err: any) {
+    console.error('Select device error:', err);
+    res.status(500).json({
+      error: {
+        code: 'server_error',
+        message: 'Failed to update selected device',
+      },
+    });
+  }
 }
 

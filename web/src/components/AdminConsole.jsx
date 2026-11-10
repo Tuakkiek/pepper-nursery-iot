@@ -1,58 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
+  Sprout,
   LayoutDashboard,
-  SlidersHorizontal, 
-  Users, 
-  ShieldCheck, 
-  Plus, 
-  Search, 
-  Filter, 
-  Trash2, 
-  Edit, 
-  CheckCircle, 
-  XCircle, 
+  SlidersHorizontal,
+  Users,
+  Plus,
+  Search,
+  Trash2,
+  Edit3,
   RefreshCw,
-  ArrowRightLeft,
-  Shield,
-  User as UserIcon,
   LogOut,
-  ShieldAlert
+  Menu,
+  X,
+  Radio,
+  ArrowRight,
+  RotateCcw,
+  ShieldAlert,
+  CheckCircle2
 } from 'lucide-react';
 import { apiService } from '../services/api.js';
 import RuleModal from './RuleModal.jsx';
-import UserModal from './UserModal.jsx';
+import ConfirmModal from './ConfirmModal.jsx';
 
 const PARAM_CONFIG = {
-  air_temperature_c: { label: 'Nhiệt độ KK', unit: '°C', category: 'Không khí' },
-  air_humidity_pct: { label: 'Độ ẩm KK', unit: '%', category: 'Không khí' },
-  soil_temperature_c: { label: 'Nhiệt độ đất', unit: '°C', category: 'Đất' },
-  soil_moisture_pct: { label: 'Độ ẩm đất', unit: '%', category: 'Đất' },
-  water_ph: { label: 'pH dung dịch', unit: '', category: 'Dinh dưỡng' },
-  water_tds_ppm: { label: 'TDS dung dịch', unit: 'ppm', category: 'Dinh dưỡng' },
+  air_temperature_c: { label: 'Nhiệt độ không khí', short: 'Nhiệt độ KK', unit: '°C', category: 'Không khí' },
+  air_humidity_pct: { label: 'Độ ẩm không khí', short: 'Độ ẩm KK', unit: '%', category: 'Không khí' },
+  soil_temperature_c: { label: 'Nhiệt độ đất', short: 'Nhiệt độ đất', unit: '°C', category: 'Giá thể' },
+  soil_moisture_pct: { label: 'Độ ẩm đất', short: 'Độ ẩm đất', unit: '%', category: 'Giá thể' },
+  water_ph: { label: 'pH dung dịch', short: 'pH nước', unit: 'pH', category: 'Dinh dưỡng' },
+  water_tds_ppm: { label: 'TDS dung dịch', short: 'TDS nước', unit: 'ppm', category: 'Dinh dưỡng' },
 };
 
-const formatThreshold = (r) => {
+const SEVERITY_META = {
+  danger: { label: 'Nguy hiểm', badgeClass: 'badge-error', barClass: 'bar-danger' },
+  critical: { label: 'Nguy hiểm', badgeClass: 'badge-error', barClass: 'bar-danger' },
+  warning: { label: 'Cảnh báo', badgeClass: 'badge-stale', barClass: 'bar-warning' },
+  info: { label: 'Thông tin', badgeClass: 'badge-normal', barClass: 'bar-info' }
+};
+
+const ROLE_LABELS = {
+  admin: 'Quản trị viên',
+  user: 'Người dùng'
+};
+
+function formatThreshold(r) {
   const unit = PARAM_CONFIG[r.parameter]?.unit ? ` ${PARAM_CONFIG[r.parameter].unit}` : '';
   if (r.operator === 'between') {
-    return `${r.threshold_min ?? '?'} ~ ${r.threshold_max ?? '?'}${unit}`;
+    return `${r.threshold_min ?? '?'} – ${r.threshold_max ?? '?'}${unit}`;
   }
   if (r.operator === 'outside') {
     return `< ${r.threshold_min} hoặc > ${r.threshold_max}${unit}`;
   }
-  return `${r.operator} ${r.threshold_min ?? r.threshold_max ?? ''}${unit}`;
-};
+  const bound = r.threshold_min ?? r.threshold_max ?? '';
+  return `${r.operator} ${bound}${unit}`;
+}
+
+function formatDateVi(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch {
+    return '—';
+  }
+}
 
 export default function AdminConsole({ user, onLogout, showToast }) {
-  // Sidebar Menu State: 'dashboard' | 'rules' | 'users'
-  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [activeMenu, setActiveMenu] = useState('dashboard'); // 'dashboard' | 'rules' | 'users'
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Rules State
   const [rules, setRules] = useState([]);
   const [loadingRules, setLoadingRules] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [paramFilter, setParamFilter] = useState('ALL');
+  const [severityFilter, setSeverityFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [pageSize, setPageSize] = useState('ALL'); // 'ALL' | 5 | 10 | 20
+  const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [ruleModalOpen, setRuleModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
@@ -62,20 +89,24 @@ export default function AdminConsole({ user, onLogout, showToast }) {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('ALL');
-  const [userModalOpen, setUserModalOpen] = useState(false);
+
+  // Telemetry Bridge State
+  const [bridgeStatus, setBridgeStatus] = useState(null);
+  const [syncingBridge, setSyncingBridge] = useState(false);
+
+  // Logout Confirm Modal
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   const isAdmin = user && user.role === 'admin';
 
   useEffect(() => {
-    loadRules();
-    loadUsers();
+    refreshAll();
   }, []);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, paramFilter, statusFilter]);
+  }, [searchTerm, paramFilter, severityFilter, statusFilter]);
 
-  // Load Rules
   const loadRules = async () => {
     setLoadingRules(true);
     try {
@@ -88,7 +119,6 @@ export default function AdminConsole({ user, onLogout, showToast }) {
     }
   };
 
-  // Load Users
   const loadUsers = async () => {
     setLoadingUsers(true);
     try {
@@ -101,15 +131,40 @@ export default function AdminConsole({ user, onLogout, showToast }) {
     }
   };
 
+  const loadBridgeStatus = async () => {
+    try {
+      const status = await apiService.getBridgeStatus();
+      setBridgeStatus(status);
+    } catch {
+      // handled gracefully in apiService
+    }
+  };
+
+  const refreshAll = () => {
+    loadRules();
+    loadUsers();
+    loadBridgeStatus();
+  };
+
+  const handleSyncBridge = async () => {
+    setSyncingBridge(true);
+    try {
+      const res = await apiService.syncBridge();
+      showToast(`Đã đồng bộ Bridge thành công (${res.new_readings_count || 0} bản ghi mới)`, 'success');
+      loadBridgeStatus();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSyncingBridge(false);
+    }
+  };
+
   // Rule Handlers
   const handleToggleActive = async (rule) => {
-    if (!isAdmin) {
-      showToast('Cần quyền Admin để chỉnh sửa quy tắc', 'error');
-      return;
-    }
+    if (!isAdmin) return;
     try {
       await apiService.updateRule(rule.id, { is_active: !rule.is_active });
-      showToast(`Đã ${!rule.is_active ? 'kích hoạt' : 'tắt'} quy tắc ${rule.rule_code}`, 'success');
+      showToast(`Đã ${!rule.is_active ? 'bật' : 'tắt'} quy tắc ${rule.rule_code}`, 'success');
       loadRules();
     } catch (err) {
       showToast(err.message, 'error');
@@ -117,15 +172,11 @@ export default function AdminConsole({ user, onLogout, showToast }) {
   };
 
   const handleDeleteRule = async (id, code) => {
-    if (!isAdmin) {
-      showToast('Cần quyền Admin để xóa quy tắc', 'error');
-      return;
-    }
+    if (!isAdmin) return;
     if (!window.confirm(`Bạn có chắc chắn muốn xóa quy tắc [${code}]?`)) return;
-
     try {
       await apiService.deleteRule(id);
-      showToast(`Đã xóa thành công quy tắc #${id}`, 'success');
+      showToast(`Đã xóa quy tắc ${code}`, 'success');
       loadRules();
     } catch (err) {
       showToast(err.message, 'error');
@@ -150,870 +201,805 @@ export default function AdminConsole({ user, onLogout, showToast }) {
   };
 
   // User Handlers
-  const handleCreateUser = async (payload) => {
-    if (!isAdmin) {
-      showToast('Chỉ Quản trị viên mới có quyền tạo người dùng', 'error');
-      return;
-    }
-    try {
-      await apiService.createUser(payload);
-      showToast(`Tạo thành công tài khoản [${payload.username}] với vai trò ${payload.role}!`, 'success');
-      loadUsers();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  const handleToggleUserRole = async (targetUser) => {
-    if (!isAdmin) {
-      showToast('Cần quyền Admin để thay đổi vai trò', 'error');
-      return;
-    }
-    if (user && user.username === targetUser.username) {
-      showToast('Không thể tự thay đổi vai trò của chính mình!', 'error');
-      return;
-    }
-    const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
-    const confirmMsg = `Chuyển vai trò của [${targetUser.username}] sang ${newRole === 'admin' ? 'Quản trị viên (admin)' : 'Kỹ thuật viên (user)'}?`;
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      await apiService.updateUserRole(targetUser.id, newRole);
-      showToast(`Đã cập nhật vai trò của [${targetUser.username}] thành ${newRole}`, 'success');
-      loadUsers();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
   const handleDeleteUser = async (targetUser) => {
-    if (!isAdmin) {
-      showToast('Cần quyền Admin để xóa người dùng', 'error');
-      return;
-    }
+    if (!isAdmin) return;
     if (user && user.username === targetUser.username) {
-      showToast('Bạn không thể tự xóa tài khoản đang đăng nhập!', 'error');
+      showToast('Không thể xóa tài khoản đang đăng nhập', 'error');
       return;
     }
     if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản [${targetUser.username}]?`)) return;
 
     try {
       await apiService.deleteUser(targetUser.id);
-      showToast(`Đã xóa tài khoản [${targetUser.username}] thành công`, 'success');
+      showToast(`Đã xóa tài khoản ${targetUser.username}`, 'success');
       loadUsers();
     } catch (err) {
       showToast(err.message, 'error');
     }
   };
 
-  // Filter Rules
+  const handleSelectMenu = (menu) => {
+    setActiveMenu(menu);
+    setSidebarOpen(false);
+  };
+
+  const handleJumpToParamRules = (paramKey) => {
+    setParamFilter(paramKey);
+    setSearchTerm('');
+    setSeverityFilter('ALL');
+    setStatusFilter('ALL');
+    setActiveMenu('rules');
+  };
+
+  const resetRuleFilters = () => {
+    setSearchTerm('');
+    setParamFilter('ALL');
+    setSeverityFilter('ALL');
+    setStatusFilter('ALL');
+  };
+
+  // Filtered Rules & Pagination
   const filteredRules = rules.filter(r => {
-    const matchSearch = r.rule_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.action_advice?.toLowerCase().includes(searchTerm.toLowerCase());
-
+    const q = searchTerm.trim().toLowerCase();
+    const matchSearch =
+      !q ||
+      r.rule_code?.toLowerCase().includes(q) ||
+      r.name?.toLowerCase().includes(q) ||
+      r.action_advice?.toLowerCase().includes(q);
     const matchParam = paramFilter === 'ALL' || r.parameter === paramFilter;
-    const matchStatus = statusFilter === 'ALL' || (statusFilter === 'ACTIVE' ? r.is_active : !r.is_active);
-
-    return matchSearch && matchParam && matchStatus;
+    const matchSeverity =
+      severityFilter === 'ALL' ||
+      (severityFilter === 'danger' ? (r.severity === 'danger' || r.severity === 'critical') : r.severity === severityFilter);
+    const matchStatus =
+      statusFilter === 'ALL' || (statusFilter === 'ACTIVE' ? r.is_active : !r.is_active);
+    return matchSearch && matchParam && matchSeverity && matchStatus;
   });
 
-  // Pagination calculation for rules
-  const totalItems = filteredRules.length;
-  const itemsPerPage = pageSize === 'ALL' ? totalItems : Number(pageSize);
-  const totalPages = itemsPerPage > 0 ? Math.ceil(totalItems / itemsPerPage) : 1;
-  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages || 1);
-  const startIndex = pageSize === 'ALL' ? 0 : (validCurrentPage - 1) * itemsPerPage;
-  const displayedRules = pageSize === 'ALL' ? filteredRules : filteredRules.slice(startIndex, startIndex + itemsPerPage);
+  const hasActiveRuleFilters =
+    searchTerm !== '' || paramFilter !== 'ALL' || severityFilter !== 'ALL' || statusFilter !== 'ALL';
 
-  // Filter Users
+  const totalItems = filteredRules.length;
+  const itemsPerPage = pageSize === 'ALL' ? (totalItems || 1) : Number(pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = pageSize === 'ALL' ? 0 : (validCurrentPage - 1) * itemsPerPage;
+  const displayedRules =
+    pageSize === 'ALL' ? filteredRules : filteredRules.slice(startIndex, startIndex + itemsPerPage);
+  const displayEnd = Math.min(startIndex + displayedRules.length, totalItems);
+
+  // Filtered Users
   const filteredUsers = users.filter(u => {
-    const matchSearch = u.username?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      u.full_name?.toLowerCase().includes(userSearchTerm.toLowerCase());
+    const q = userSearchTerm.trim().toLowerCase();
+    const matchSearch =
+      !q || u.username?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q);
     const matchRole = userRoleFilter === 'ALL' || u.role === userRoleFilter;
     return matchSearch && matchRole;
   });
 
-  // Helper counts
+  // Metrics
   const activeRulesCount = rules.filter(r => r.is_active).length;
-  const inactiveRulesCount = rules.filter(r => !r.is_active).length;
+  const inactiveRulesCount = rules.length - activeRulesCount;
+  const activePct = rules.length > 0 ? Math.round((activeRulesCount / rules.length) * 100) : 0;
+  const coveredParamsCount = Object.keys(PARAM_CONFIG).filter(
+    key => rules.some(r => r.parameter === key && r.is_active)
+  ).length;
+
   const adminUsersCount = users.filter(u => u.role === 'admin').length;
   const techUsersCount = users.filter(u => u.role === 'user').length;
 
+  const dangerCount = rules.filter(r => r.severity === 'danger' || r.severity === 'critical').length;
+  const warningCount = rules.filter(r => r.severity === 'warning').length;
+  const infoCount = rules.filter(r => r.severity === 'info').length;
+
+  const viewMeta = {
+    dashboard: {
+      title: 'Tổng quan hệ thống',
+      subtitle: 'Theo dõi cấu hình quy tắc nông học, phân quyền tài khoản và trạng thái đồng bộ'
+    },
+    rules: {
+      title: 'Quy tắc chăm sóc',
+      subtitle: 'Quản lý ngưỡng cảnh báo và khuyến nghị hành động cho 6 thông số vườn ươm'
+    },
+    users: {
+      title: 'Quản lý người dùng',
+      subtitle: 'Danh sách tài khoản và phân quyền Quản trị viên (admin) / Người dùng (user)'
+    }
+  };
+
+  const currentView = viewMeta[activeMenu];
+  const isBusy = loadingRules || loadingUsers;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', width: '100%' }}>
-      
-      {/* ================= 1. HEADER DÀNH RIÊNG CHO TRANG QUẢN TRỊ ADMIN ================= */}
-      <header className="card" style={{
-        padding: '14px 20px',
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '12px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="brand-logo-icon" style={{ width: '42px', height: '42px', fontSize: '22px' }}>
-            🌱
+    <div className="admin-shell">
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+      )}
+
+      {/* ================= SIDEBAR ================= */}
+      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="sidebar-brand-mark" aria-hidden="true">
+              <Sprout size={18} strokeWidth={2.2} />
+            </div>
+            <div className="sidebar-brand-text">
+              <span className="sidebar-brand-name">Pepper Nursery</span>
+              <span className="sidebar-brand-sub">Admin Console</span>
+            </div>
           </div>
-          <div>
-            <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-              Hệ Thống Quản Trị Vườn Ươm Ớt IoT
-            </h1>
-            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-              Trung tâm Quản trị Quy tắc & Quản lý Người dùng
-            </p>
-          </div>
+          <button
+            type="button"
+            className="sidebar-close-mobile"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Đóng menu"
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '5px 12px',
-            background: 'var(--surface-alt)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-pill)',
-            fontSize: '13px',
-            fontWeight: '600'
-          }}>
-            <ShieldCheck size={16} color="var(--brand-coral)" />
-            <span>{user?.full_name || user?.username || 'Admin'}</span>
-            <span className="badge badge-error" style={{ fontSize: '10px' }}>admin</span>
+        <div className="sidebar-nav-section">
+          <div className="sidebar-section-label">Điều hành</div>
+          <nav className="sidebar-nav" aria-label="Menu quản trị">
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeMenu === 'dashboard' ? 'active' : ''}`}
+              onClick={() => handleSelectMenu('dashboard')}
+            >
+              <span className="sidebar-nav-left">
+                <LayoutDashboard size={17} />
+                <span>Tổng quan</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeMenu === 'rules' ? 'active' : ''}`}
+              onClick={() => handleSelectMenu('rules')}
+            >
+              <span className="sidebar-nav-left">
+                <SlidersHorizontal size={17} />
+                <span>Quy tắc chăm sóc</span>
+              </span>
+              <span className="sidebar-count tabular-nums">{rules.length}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeMenu === 'users' ? 'active' : ''}`}
+              onClick={() => handleSelectMenu('users')}
+            >
+              <span className="sidebar-nav-left">
+                <Users size={17} />
+                <span>Người dùng</span>
+              </span>
+              <span className="sidebar-count tabular-nums">{users.length}</span>
+            </button>
+          </nav>
+        </div>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-account">
+            <div className="account-avatar" aria-hidden="true">
+              {(user?.full_name || user?.username || 'A').charAt(0).toUpperCase()}
+            </div>
+            <div className="account-meta">
+              <div className="account-name">{user?.full_name || user?.username}</div>
+              <div className="account-role">@{user?.username} · {ROLE_LABELS[user?.role] || user?.role}</div>
+            </div>
+            {onLogout && (
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setLogoutModalOpen(true)}
+                title="Đăng xuất"
+                aria-label="Đăng xuất"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* ================= MAIN WORKSPACE ================= */}
+      <div className="admin-main">
+        {/* Sticky Topbar */}
+        <header className="admin-topbar">
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="topbar-menu-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Mở menu"
+            >
+              <Menu size={19} />
+            </button>
+            <div className="topbar-breadcrumb">
+              <span className="breadcrumb-root">Admin</span>
+              <span className="breadcrumb-sep">/</span>
+              <span className="breadcrumb-current">{currentView.title}</span>
+            </div>
           </div>
 
-          {onLogout && (
+          <div className="topbar-actions">
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={onLogout}
-              title="Đăng xuất khỏi hệ thống"
+              onClick={refreshAll}
+              disabled={isBusy}
             >
-              <LogOut size={14} />
-              <span>Đăng xuất</span>
+              <RefreshCw size={14} className={isBusy ? 'auth-spinner' : ''} />
+              <span>Làm mới</span>
             </button>
-          )}
-        </div>
-      </header>
 
-      {/* ================= 2. BỐ CỤC SIDEBAR + NỘI DUNG ================= */}
-      <div className="admin-portal-wrapper">
-        
-        {/* SIDEBAR BÊN TRÁI: 3 MỤC DASHBOARD, QUY TẮC, NGƯỜI DÙNG */}
-        <aside className="admin-sidebar">
-          <div className="admin-sidebar-brand">
-            <div className="admin-badge-tag">
-              <ShieldCheck size={13} />
-              <span>Menu Quản Trị</span>
-            </div>
-            <h2 className="admin-sidebar-title">
-              <Shield size={20} color="var(--brand-coral)" />
-              <span>Admin Console</span>
-            </h2>
-            <p className="admin-sidebar-sub">
-              Điều hành chính sách vi khí hậu & người dùng
-            </p>
+            {isAdmin && activeMenu !== 'users' && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  setEditingRule(null);
+                  setRuleModalOpen(true);
+                }}
+              >
+                <Plus size={15} />
+                <span>Thêm quy tắc</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Main Content Canvas */}
+        <main className="admin-workspace">
+          <div className="workspace-header">
+            <h1>{currentView.title}</h1>
+            <p>{currentView.subtitle}</p>
           </div>
 
-          {/* 3 Mục Sidebar theo yêu cầu người dùng */}
-          <nav className="admin-nav-menu" aria-label="Menu quản trị">
-            <button
-              type="button"
-              className={`admin-nav-btn ${activeMenu === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('dashboard')}
-            >
-              <div className="admin-nav-btn-left">
-                <LayoutDashboard size={18} />
-                <span>Dashboard</span>
-              </div>
-              <span className="admin-nav-badge">Tổng quan</span>
-            </button>
-
-            <button
-              type="button"
-              className={`admin-nav-btn ${activeMenu === 'rules' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('rules')}
-            >
-              <div className="admin-nav-btn-left">
-                <SlidersHorizontal size={18} />
-                <span>Quản trị Bản Quy tắc</span>
-              </div>
-              <span className="admin-nav-badge">{rules.length}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`admin-nav-btn ${activeMenu === 'users' ? 'active' : ''}`}
-              onClick={() => setActiveMenu('users')}
-            >
-              <div className="admin-nav-btn-left">
-                <Users size={18} />
-                <span>Quản lý Người dùng</span>
-              </div>
-              <span className="admin-nav-badge">{users.length}</span>
-            </button>
-          </nav>
-
-          {/* Chân Sidebar */}
-          <div className="admin-sidebar-footer">
-            <div className="admin-user-card">
-              <div className="admin-avatar-circle">
-                {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'A'}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="admin-user-name">{user?.full_name || user?.username || 'Quản trị viên'}</span>
-                <span className="admin-user-role">{user?.role || 'admin'}</span>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* KHUNG NỘI DUNG CHÍNH (CONTENT PANE) */}
-        <main className="admin-content-pane">
-          
-          {/* Cảnh báo phân quyền nếu không phải Admin */}
           {!isAdmin && (
             <div className="advice-banner warning">
               <div className="advice-icon-wrap">
-                <ShieldAlert size={28} color="var(--amber-strong)" />
+                <ShieldAlert size={22} />
               </div>
               <div className="advice-body">
-                <div className="advice-title">Chế độ xem Quản trị (Read-Only)</div>
+                <div className="advice-title">Chế độ chỉ đọc</div>
                 <div className="advice-text">
-                  Bạn đang đăng nhập với vai trò <strong>Kỹ thuật viên (user)</strong>. Để cấu hình quy tắc hoặc thêm người dùng, vui lòng sử dụng tài khoản Quản trị viên (admin).
+                  Tài khoản hiện tại không có quyền Quản trị viên (admin) nên các thao tác chỉnh sửa bị vô hiệu hóa.
                 </div>
               </div>
             </div>
           )}
 
-          {/* ================= VIEW 1: DASHBOARD QUẢN TRỊ ================= */}
+          {/* ================= VIEW 1: TỔNG QUAN ================= */}
           {activeMenu === 'dashboard' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-              
-              {/* Header Dashboard */}
-              <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-                  <div>
-                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-                      📊 Dashboard Quản Trị Hệ Thống
-                    </h3>
-                    <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-                      Thống kê tổng quan chính sách quy tắc nông học và tình trạng phân quyền tài khoản
-                    </p>
+            <div className="workspace-stack">
+              {/* 4 KPI Strip */}
+              <div className="kpi-grid">
+                <div className="kpi-card">
+                  <div className="kpi-head">
+                    <span className="kpi-label">Tổng số quy tắc</span>
+                    <SlidersHorizontal size={16} className="kpi-icon" />
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={() => { loadRules(); loadUsers(); }}
-                      title="Làm mới dữ liệu quản trị"
+                  <div className="kpi-value tabular-nums">{rules.length}</div>
+                  <div className="kpi-sub">
+                    {activeRulesCount} đang bật · {inactiveRulesCount} tạm dừng
+                  </div>
+                </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-head">
+                    <span className="kpi-label">Độ phủ giám sát</span>
+                    <CheckCircle2 size={16} className="kpi-icon kpi-icon-teal" />
+                  </div>
+                  <div className="kpi-value tabular-nums">{activePct}%</div>
+                  <div className="kpi-sub">
+                    Bao phủ {coveredParamsCount}/6 thông số cảm biến
+                  </div>
+                </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-head">
+                    <span className="kpi-label">Tài khoản hệ thống</span>
+                    <Users size={16} className="kpi-icon" />
+                  </div>
+                  <div className="kpi-value tabular-nums">{users.length}</div>
+                  <div className="kpi-sub">
+                    {adminUsersCount} {ROLE_LABELS.admin} · {techUsersCount} {ROLE_LABELS.user}
+                  </div>
+                </div>
+
+                <div className="kpi-card">
+                  <div className="kpi-head">
+                    <span className="kpi-label">Telemetry Bridge</span>
+                    <Radio size={16} className="kpi-icon kpi-icon-teal" />
+                  </div>
+                  <div className="kpi-status-row">
+                    <span className={`status-dot ${bridgeStatus?.is_running !== false ? 'online' : ''}`} />
+                    <span className="kpi-status-text">
+                      {bridgeStatus?.is_running !== false ? 'Đang hoạt động' : 'Tạm dừng'}
+                    </span>
+                  </div>
+                  <div className="kpi-sub kpi-sub-action">
+                    <span>Kênh #{bridgeStatus?.channel_id || 1}</span>
+                    <button
+                      type="button"
+                      className="inline-action-link"
+                      onClick={handleSyncBridge}
+                      disabled={syncingBridge}
                     >
-                      <RefreshCw size={14} />
-                      <span>Làm mới Dashboard</span>
+                      {syncingBridge ? 'Đang đồng bộ...' : 'Đồng bộ ngay'}
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Thẻ KPI Quản trị */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-4)' }}>
-                {/* KPI 1 */}
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>TỔNG SỐ QUY TẮC</div>
-                  <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--brand-navy)', margin: '2px 0' }}>{rules.length}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--success-strong)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircle size={13} />
-                    <span><strong>{activeRulesCount}</strong> đang kích hoạt ({Math.round((activeRulesCount / (rules.length || 1)) * 100)}%)</span>
+              {/* 2-Column Analytical Grid */}
+              <div className="dashboard-split">
+                {/* Left: Phân bố theo 6 thông số */}
+                <section className="panel-card">
+                  <div className="panel-header">
+                    <div>
+                      <h2 className="panel-title">Phân bố quy tắc theo thông số</h2>
+                      <p className="panel-desc">Nhấp vào từng thông số để lọc danh sách quy tắc tương ứng</p>
+                    </div>
                   </div>
-                </div>
-
-                {/* KPI 2 */}
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>QUY TẮC TẠM DỪNG</div>
-                  <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--text-secondary)', margin: '2px 0' }}>{rules.length - activeRulesCount}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <XCircle size={13} />
-                    <span>Chờ bật kích hoạt hoặc điều chỉnh ngưỡng</span>
-                  </div>
-                </div>
-
-                {/* KPI 3 */}
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>TỔNG SỐ TÀI KHOẢN</div>
-                  <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--brand-navy)', margin: '2px 0' }}>{users.length}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    Gồm <strong style={{ color: 'var(--brand-coral)' }}>{adminUsersCount} Admin</strong> và <strong>{techUsersCount} Kỹ thuật</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2 Khối Phân Tích Quản Trị Chuyên Sâu */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-4)' }}>
-                
-                {/* Phân bố quy tắc theo 6 thông số đo lường */}
-                <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-                      📋 Phân Bố Quy Tắc theo 6 Thông Số Nông Học
-                    </h4>
-                    <span className="badge badge-normal" style={{ fontSize: '11px' }}>6 Nhóm Thông số</span>
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-                    Thống kê số lượng quy tắc bảo vệ cây ớt con được cấu hình cho từng đại lượng (Không hiển thị số đo thời gian thực):
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-                    {Object.entries(PARAM_CONFIG).map(([paramKey, conf]) => {
-                      const count = rules.filter(r => r.parameter === paramKey).length;
-                      const activeCount = rules.filter(r => r.parameter === paramKey && r.is_active).length;
+                  <div className="param-list">
+                    {Object.entries(PARAM_CONFIG).map(([key, conf]) => {
+                      const total = rules.filter(r => r.parameter === key).length;
+                      const active = rules.filter(r => r.parameter === key && r.is_active).length;
+                      const pct = total > 0 ? Math.round((active / total) * 100) : 0;
                       return (
-                        <div key={paramKey} style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          background: 'var(--brand-cream)',
-                          borderRadius: 'var(--radius-md)',
-                          border: '1px solid var(--border-subtle)',
-                          fontSize: '13px'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span className="badge badge-empty" style={{ fontSize: '10.5px' }}>{conf.category}</span>
-                            <strong style={{ color: 'var(--brand-navy)' }}>{conf.label}</strong>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>({paramKey})</span>
+                        <button
+                          key={key}
+                          type="button"
+                          className="param-row-btn"
+                          onClick={() => handleJumpToParamRules(key)}
+                        >
+                          <div className="param-row-top">
+                            <div className="param-row-label">
+                              <span className="param-name">{conf.label}</span>
+                              <code className="param-key">{key}</code>
+                            </div>
+                            <span className="param-count tabular-nums">
+                              <strong>{active}</strong>/{total} bật
+                            </span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{count} quy tắc</span>
-                            <span className="badge badge-ok" style={{ fontSize: '10px' }}>{activeCount} bật</span>
+                          <div className="progress-track">
+                            <div className="progress-fill" style={{ width: `${pct}%` }} />
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
-                </div>
+                </section>
 
-                {/* Ma trận phân quyền & Quyền hạn hệ thống */}
-                <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-                      🛡️ Chính Sách Phân Quyền Vai Trò (RBAC)
-                    </h4>
-                    <span className="badge badge-ok" style={{ fontSize: '11px' }}>Bảo mật</span>
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-                    Quyền hạn tương ứng giữa Người dùng Kỹ thuật và Quản trị viên:
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-                    <div style={{
-                      padding: '12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface)'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span className="badge badge-error">🛡️ Quản trị viên (admin)</span>
-                        <strong style={{ fontSize: '12px', color: 'var(--coral-strong)' }}>{adminUsersCount} tài khoản</strong>
+                {/* Right: Severity breakdown + RBAC summary */}
+                <div className="dashboard-right-stack">
+                  <section className="panel-card">
+                    <div className="panel-header">
+                      <div>
+                        <h2 className="panel-title">Phân loại theo mức độ</h2>
+                        <p className="panel-desc">Tỷ trọng quy tắc trong động cơ đánh giá</p>
                       </div>
-                      <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                        <li>Toàn quyền thêm, chỉnh sửa, bật/tắt và xóa quy tắc nông học</li>
-                        <li>Tạo tài khoản mới và điều chỉnh vai trò thành viên</li>
-                        <li>Toàn quyền truy cập Dashboard và cấu hình hệ thống</li>
-                      </ul>
                     </div>
+                    <div className="severity-bars">
+                      {[
+                        { key: 'danger', label: 'Nguy hiểm (Danger)', count: dangerCount, cls: 'bar-danger' },
+                        { key: 'warning', label: 'Cảnh báo (Warning)', count: warningCount, cls: 'bar-warning' },
+                        { key: 'info', label: 'Thông tin (Info)', count: infoCount, cls: 'bar-info' }
+                      ].map(item => {
+                        const pct = rules.length > 0 ? Math.round((item.count / rules.length) * 100) : 0;
+                        return (
+                          <div key={item.key} className="severity-item">
+                            <div className="severity-item-top">
+                              <span>{item.label}</span>
+                              <span className="tabular-nums">
+                                <strong>{item.count}</strong> ({pct}%)
+                              </span>
+                            </div>
+                            <div className="progress-track">
+                              <div className={`progress-fill ${item.cls}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
 
-                    <div style={{
-                      padding: '12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface)'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span className="badge badge-normal">👨‍🌾 Kỹ thuật viên (user)</span>
-                        <strong style={{ fontSize: '12px', color: 'var(--brand-navy)' }}>{techUsersCount} tài khoản</strong>
+                  <section className="panel-card">
+                    <div className="panel-header">
+                      <div>
+                        <h2 className="panel-title">Phân quyền hệ thống (RBAC)</h2>
+                        <p className="panel-desc">Phạm vi truy cập giữa Web Admin và Mobile</p>
                       </div>
-                      <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                        <li>Xem số đo cảm biến thời gian thực ở trang Giám sát người dùng</li>
-                        <li>Nhận thông báo và hướng dẫn chăm sóc tự động</li>
-                        <li>Chế độ xem chỉ đọc (Read-only) đối với quy tắc và người dùng</li>
-                      </ul>
                     </div>
-                  </div>
+                    <div className="rbac-list">
+                      <div className="rbac-row">
+                        <div className="rbac-role-col">
+                          <span className="badge badge-error">{ROLE_LABELS.admin} (admin)</span>
+                          <span className="rbac-count tabular-nums">{adminUsersCount} tài khoản</span>
+                        </div>
+                        <p className="rbac-desc">
+                          Toàn quyền CRUD quy tắc chăm sóc và quản trị hệ thống trên Web Console.
+                        </p>
+                      </div>
+                      <div className="rbac-row">
+                        <div className="rbac-role-col">
+                          <span className="badge badge-normal">{ROLE_LABELS.user} (user)</span>
+                          <span className="rbac-count tabular-nums">{techUsersCount} tài khoản</span>
+                        </div>
+                        <p className="rbac-desc">
+                          Giám sát số đo cảm biến và nhận khuyến nghị trên ứng dụng Mobile; không vào Web Admin.
+                        </p>
+                      </div>
+                    </div>
+                  </section>
                 </div>
-
               </div>
 
-              {/* Lối tắt thao tác nhanh */}
-              <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', background: 'var(--teal-soft)', border: '1px solid var(--brand-teal)', borderRadius: 'var(--radius-lg)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+              {/* Preview Table: Quy tắc mới nhất / tiêu biểu */}
+              <section className="panel-card">
+                <div className="panel-header">
                   <div>
-                    <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-                      ⚡ Lối Tắt Thao Tác Quản Trị
-                    </h4>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Chuyển nhanh tới các phân hệ hoặc mở giao diện cấu hình
-                    </span>
+                    <h2 className="panel-title">Quy tắc đang kích hoạt</h2>
+                    <p className="panel-desc">Xem nhanh các ngưỡng đang áp dụng cho luồng dữ liệu</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <button 
-                      className="btn btn-primary btn-sm"
-                      onClick={() => { setActiveMenu('rules'); setEditingRule(null); setRuleModalOpen(true); }}
-                      disabled={!isAdmin}
-                    >
-                      <Plus size={14} />
-                      <span>Thêm quy tắc mới</span>
-                    </button>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => { setActiveMenu('users'); setUserModalOpen(true); }}
-                      disabled={!isAdmin}
-                    >
-                      <Plus size={14} />
-                      <span>Thêm tài khoản người dùng</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ================= VIEW 2: QUẢN TRỊ BẢN QUY TẮC ================= */}
-          {activeMenu === 'rules' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-              
-              {/* Header phân hệ Quy tắc */}
-              <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-                  <div>
-                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-                      📋 Danh Sách Quy Tắc Chăm Sóc Cây Ớt Con
-                    </h3>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Cấu hình các ngưỡng an toàn và khuyến cáo kỹ thuật tự động cho vườn ươm
-                    </span>
-                  </div>
-                  {isAdmin && (
-                    <button 
-                      className="btn btn-primary btn-sm"
-                      onClick={() => { setEditingRule(null); setRuleModalOpen(true); }}
-                    >
-                      <Plus size={15} />
-                      <span>Thêm quy tắc mới</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* 3 Thẻ thống kê KPI quy tắc */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)' }}>
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>TỔNG SỐ QUY TẮC</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--brand-navy)', margin: '3px 0' }}>{rules.length}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Quy tắc bảo vệ cây ớt con</div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleSelectMenu('rules')}
+                  >
+                    <span>Xem tất cả ({rules.length})</span>
+                    <ArrowRight size={14} />
+                  </button>
                 </div>
 
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>ĐANG KÍCH HOẠT</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--success-strong)', margin: '3px 0' }}>
-                    {activeRulesCount}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--success-strong)' }}>● Đang kiểm soát tự động</div>
-                </div>
-
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>TẠM DỪNG / VÔ HIỆU HÓA</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-muted)', margin: '3px 0' }}>
-                    {inactiveRulesCount}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>○ Tạm thời không đánh giá</div>
-                </div>
-              </div>
-
-              {/* Toolbar lọc quy tắc */}
-              <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', alignItems: 'center' }}>
-                  <div style={{ position: 'relative', flex: '1 1 220px' }}>
-                    <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-secondary)' }} />
-                    <input 
-                      type="text"
-                      placeholder="Tìm theo mã, tên quy tắc, hướng dẫn..."
-                      className="form-input"
-                      style={{ paddingLeft: '32px', width: '100%', fontSize: '13px' }}
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Filter size={14} color="var(--text-secondary)" />
-                    <select 
-                      className="select-input"
-                      value={paramFilter}
-                      onChange={(e) => setParamFilter(e.target.value)}
-                      style={{ fontSize: '13px' }}
-                    >
-                      <option value="ALL">Tất cả thông số</option>
-                      <option value="air_temperature_c">Nhiệt độ không khí</option>
-                      <option value="air_humidity_pct">Độ ẩm không khí</option>
-                      <option value="soil_temperature_c">Nhiệt độ đất</option>
-                      <option value="soil_moisture_pct">Độ ẩm đất</option>
-                      <option value="water_ph">Độ pH nước</option>
-                      <option value="water_tds_ppm">TDS dung dịch</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <select 
-                      className="select-input"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      style={{ fontSize: '13px' }}
-                    >
-                      <option value="ALL">Tất cả trạng thái</option>
-                      <option value="ACTIVE">Đang bật (Active)</option>
-                      <option value="INACTIVE">Đang tắt (Inactive)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Bảng Quy tắc vừa khít 1 màn hình */}
-                <div className="rules-table-wrap">
-                  <table className="rules-table">
-                    <colgroup>
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '15%' }} />
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '14%' }} />
-                      <col style={{ width: '10%' }} />
-                      <col style={{ width: '23%' }} />
-                      <col style={{ width: '12%' }} />
-                    </colgroup>
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
                     <thead>
                       <tr>
-                        <th>Mã quy tắc</th>
-                        <th>Tên quy tắc</th>
-                        <th>Thông số</th>
-                        <th>Ngưỡng</th>
-                        <th>Mức độ</th>
-                        <th>Khuyến nghị</th>
-                        <th style={{ textAlign: 'center' }}>Thao tác</th>
+                        <th style={{ width: '20%' }}>Mã quy tắc</th>
+                        <th style={{ width: '32%' }}>Tên quy tắc</th>
+                        <th style={{ width: '18%' }}>Thông số</th>
+                        <th style={{ width: '16%' }}>Ngưỡng</th>
+                        <th style={{ width: '14%' }}>Mức độ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loadingRules ? (
                         <tr>
-                          <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
-                            Đang tải danh sách quy tắc...
-                          </td>
+                          <td colSpan="5" className="table-empty">Đang tải quy tắc...</td>
                         </tr>
-                      ) : displayedRules.length === 0 ? (
+                      ) : rules.length === 0 ? (
                         <tr>
-                          <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
-                            Không tìm thấy quy tắc nào phù hợp với bộ lọc.
-                          </td>
+                          <td colSpan="5" className="table-empty">Chưa có quy tắc nào trong hệ thống.</td>
                         </tr>
                       ) : (
-                        displayedRules.map((r) => {
-                          const paramInfo = PARAM_CONFIG[r.parameter] || { label: r.parameter, unit: '' };
+                        rules.slice(0, 5).map(r => {
+                          const sev = SEVERITY_META[r.severity] || SEVERITY_META.info;
                           return (
-                            <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.65 }}>
-                              <td>
-                                <code className="rule-code-badge" title={r.rule_code}>
-                                  {r.rule_code}
-                                </code>
-                              </td>
-                              <td>
-                                <span className="rule-name-cell" title={r.name}>
-                                  {r.name}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="rule-param-cell" title={r.parameter}>
-                                  {paramInfo.label}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="rule-threshold-cell" title={formatThreshold(r)}>
-                                  {formatThreshold(r)}
-                                </span>
-                              </td>
-                              <td>
-                                <span className={`badge ${r.severity === 'critical' ? 'badge-error' : r.severity === 'warning' ? 'badge-warning' : 'badge-normal'}`}>
-                                  {r.severity}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="rule-advice-cell" title={r.action_advice}>
-                                  {r.action_advice}
-                                </span>
-                              </td>
-                              <td>
-                                <div className="rule-actions-cell">
-                                  <button
-                                    className={`btn-icon ${r.is_active ? 'text-success' : 'text-muted'}`}
-                                    onClick={() => handleToggleActive(r)}
-                                    title={r.is_active ? 'Nhấn để tắt quy tắc' : 'Nhấn để bật quy tắc'}
-                                    disabled={!isAdmin}
-                                  >
-                                    {r.is_active ? <CheckCircle size={16} /> : <XCircle size={16} />}
-                                  </button>
-                                  <button
-                                    className="btn-icon"
-                                    onClick={() => { setEditingRule(r); setRuleModalOpen(true); }}
-                                    title="Chỉnh sửa quy tắc"
-                                    disabled={!isAdmin}
-                                  >
-                                    <Edit size={16} />
-                                  </button>
-                                  <button
-                                    className="btn-icon text-danger"
-                                    onClick={() => handleDeleteRule(r.id, r.rule_code)}
-                                    title="Xóa quy tắc"
-                                    disabled={!isAdmin}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </td>
+                            <tr key={r.id}>
+                              <td><code className="code-pill">{r.rule_code}</code></td>
+                              <td className="cell-strong">{r.name}</td>
+                              <td>{PARAM_CONFIG[r.parameter]?.short || r.parameter}</td>
+                              <td className="tabular-nums">{formatThreshold(r)}</td>
+                              <td><span className={`badge ${sev.badgeClass}`}>{sev.label}</span></td>
                             </tr>
                           );
                         })
                       )}
                     </tbody>
                   </table>
-
-                  {/* Pagination Bar */}
-                  <div className="table-pagination-bar">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>Hiển thị:</span>
-                      <select
-                        className="select-input"
-                        value={pageSize}
-                        onChange={(e) => {
-                          setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
-                          setCurrentPage(1);
-                        }}
-                        style={{ fontSize: '12px', padding: '2px 8px' }}
-                      >
-                        <option value="ALL">Tất cả ({totalItems})</option>
-                        <option value={5}>5 / trang</option>
-                        <option value={10}>10 / trang</option>
-                        <option value={20}>20 / trang</option>
-                      </select>
-                      <span>
-                        Tổng cộng: <strong>{totalItems}</strong> quy tắc
-                      </span>
-                    </div>
-
-                    {pageSize !== 'ALL' && totalPages > 1 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button
-                          className="table-pagination-btn"
-                          disabled={validCurrentPage <= 1}
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        >
-                          ‹ Trước
-                        </button>
-                        <span>
-                          Trang <strong>{validCurrentPage}</strong> / {totalPages}
-                        </span>
-                        <button
-                          className="table-pagination-btn"
-                          disabled={validCurrentPage >= totalPages}
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        >
-                          Sau ›
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </div>
-
+              </section>
             </div>
           )}
 
-          {/* ================= VIEW 3: QUẢN LÝ NGƯỜI DÙNG ================= */}
-          {activeMenu === 'users' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-              
-              {/* Header phân hệ Người dùng */}
-              <div className="card" style={{ padding: 'var(--space-4) var(--space-5)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-                  <div>
-                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
-                      👥 Quản Lý Người Dùng & Phân Quyền Hệ Thống
-                    </h3>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Cấp phát và điều chỉnh vai trò Quản trị viên (admin) hoặc Kỹ thuật viên (user)
-                    </span>
-                  </div>
-                  {isAdmin && (
-                    <button 
-                      className="btn btn-primary btn-sm"
-                      onClick={() => setUserModalOpen(true)}
+          {/* ================= VIEW 2: QUY TẮC CHĂM SÓC ================= */}
+          {activeMenu === 'rules' && (
+            <section className="panel-card">
+              {/* Filter Toolbar */}
+              <div className="table-toolbar">
+                <div className="search-field">
+                  <Search size={15} className="search-icon" />
+                  <input
+                    type="text"
+                    className="toolbar-input"
+                    placeholder="Tìm theo mã, tên quy tắc, khuyến nghị..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="toolbar-filters">
+                  <select
+                    className="toolbar-select"
+                    value={paramFilter}
+                    onChange={(e) => setParamFilter(e.target.value)}
+                    aria-label="Lọc theo thông số"
+                  >
+                    <option value="ALL">Tất cả thông số</option>
+                    {Object.entries(PARAM_CONFIG).map(([key, conf]) => (
+                      <option key={key} value={key}>{conf.label}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="toolbar-select"
+                    value={severityFilter}
+                    onChange={(e) => setSeverityFilter(e.target.value)}
+                    aria-label="Lọc theo mức độ"
+                  >
+                    <option value="ALL">Tất cả mức độ</option>
+                    <option value="danger">Nguy hiểm</option>
+                    <option value="warning">Cảnh báo</option>
+                    <option value="info">Thông tin</option>
+                  </select>
+
+                  <select
+                    className="toolbar-select"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    aria-label="Lọc theo trạng thái"
+                  >
+                    <option value="ALL">Tất cả trạng thái</option>
+                    <option value="ACTIVE">Đang bật</option>
+                    <option value="INACTIVE">Đã tắt</option>
+                  </select>
+
+                  {hasActiveRuleFilters && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={resetRuleFilters}
+                      title="Xóa bộ lọc"
                     >
-                      <Plus size={15} />
-                      <span>Thêm người dùng mới</span>
+                      <RotateCcw size={13} />
+                      <span>Đặt lại</span>
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* 3 Thẻ thống kê KPI người dùng */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)' }}>
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>TỔNG SỐ TÀI KHOẢN</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--brand-navy)', margin: '3px 0' }}>{users.length}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Tài khoản đang hoạt động</div>
-                </div>
-
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>QUẢN TRỊ VIÊN (ADMIN)</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--brand-coral)', margin: '3px 0' }}>
-                    {adminUsersCount}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--coral-strong)' }}>🛡️ Toàn quyền cấu hình</div>
-                </div>
-
-                <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>KỸ THUẬT VIÊN (USER)</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--brand-navy)', margin: '3px 0' }}>
-                    {techUsersCount}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>👨‍🌾 Giám sát & theo dõi số đo</div>
-                </div>
+              {/* Rules Data Table */}
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '16%' }}>Mã quy tắc</th>
+                      <th style={{ width: '32%' }}>Quy tắc & Khuyến nghị</th>
+                      <th style={{ width: '13%' }}>Thông số</th>
+                      <th style={{ width: '13%' }}>Ngưỡng</th>
+                      <th style={{ width: '10%' }}>Mức độ</th>
+                      <th style={{ width: '8%', textAlign: 'center' }}>Bật/Tắt</th>
+                      <th style={{ width: '8%', textAlign: 'right' }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingRules ? (
+                      <tr>
+                        <td colSpan="7" className="table-empty">Đang tải danh sách quy tắc...</td>
+                      </tr>
+                    ) : displayedRules.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="table-empty">
+                          Không tìm thấy quy tắc phù hợp với bộ lọc hiện tại.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedRules.map((r) => {
+                        const paramInfo = PARAM_CONFIG[r.parameter];
+                        const sev = SEVERITY_META[r.severity] || SEVERITY_META.info;
+                        return (
+                          <tr key={r.id} className={!r.is_active ? 'row-inactive' : ''}>
+                            <td>
+                              <code className="code-pill" title={r.rule_code}>
+                                {r.rule_code}
+                              </code>
+                            </td>
+                            <td>
+                              <div className="rule-main-cell">
+                                <div className="rule-title">{r.name}</div>
+                                <div className="rule-advice" title={r.action_advice}>
+                                  {r.action_advice}
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="cell-muted">
+                                {paramInfo ? paramInfo.short : r.parameter}
+                              </span>
+                            </td>
+                            <td className="tabular-nums cell-strong">{formatThreshold(r)}</td>
+                            <td>
+                              <span className={`badge ${sev.badgeClass}`}>{sev.label}</span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={r.is_active}
+                                aria-label={r.is_active ? 'Tắt quy tắc' : 'Bật quy tắc'}
+                                className={`toggle-switch ${r.is_active ? 'on' : ''}`}
+                                onClick={() => handleToggleActive(r)}
+                                disabled={!isAdmin}
+                                title={r.is_active ? 'Đang bật — nhấp để tắt' : 'Đã tắt — nhấp để bật'}
+                              >
+                                <span className="toggle-knob" />
+                              </button>
+                            </td>
+                            <td>
+                              <div className="row-actions">
+                                <button
+                                  type="button"
+                                  className="icon-btn"
+                                  onClick={() => {
+                                    setEditingRule(r);
+                                    setRuleModalOpen(true);
+                                  }}
+                                  title="Chỉnh sửa"
+                                  disabled={!isAdmin}
+                                >
+                                  <Edit3 size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="icon-btn icon-btn-danger"
+                                  onClick={() => handleDeleteRule(r.id, r.rule_code)}
+                                  title="Xóa quy tắc"
+                                  disabled={!isAdmin}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
 
-              {/* Bảng Danh sách Người dùng */}
-              <div className="card" style={{ padding: 'var(--space-4)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                
-                {/* Filter Bar Người dùng */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', alignItems: 'center' }}>
-                  <div style={{ position: 'relative', flex: '1 1 240px' }}>
-                    <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-secondary)' }} />
-                    <input 
+              {/* Pagination Footer */}
+              <div className="table-footer">
+                <div className="table-footer-left">
+                  <span className="tabular-nums">
+                    {totalItems === 0
+                      ? '0 quy tắc'
+                      : `Hiển thị ${startIndex + 1}–${displayEnd} trên ${totalItems} quy tắc`}
+                  </span>
+                  <select
+                    className="toolbar-select select-compact"
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    aria-label="Số dòng mỗi trang"
+                  >
+                    <option value={10}>10 / trang</option>
+                    <option value={20}>20 / trang</option>
+                    <option value={5}>5 / trang</option>
+                    <option value="ALL">Tất cả ({totalItems})</option>
+                  </select>
+                </div>
+
+                {pageSize !== 'ALL' && totalPages > 1 && (
+                  <div className="pagination-controls">
+                    <button
+                      type="button"
+                      className="page-btn"
+                      disabled={validCurrentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    >
+                      Trước
+                    </button>
+                    <span className="page-indicator tabular-nums">
+                      Trang <strong>{validCurrentPage}</strong> / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="page-btn"
+                      disabled={validCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* ================= VIEW 3: NGƯỜI DÙNG ================= */}
+          {activeMenu === 'users' && (
+            <div className="workspace-stack">
+              <section className="panel-card">
+                <div className="table-toolbar">
+                  <div className="search-field">
+                    <Search size={15} className="search-icon" />
+                    <input
                       type="text"
-                      placeholder="Tìm theo username, họ và tên..."
-                      className="form-input"
-                      style={{ paddingLeft: '32px', width: '100%', fontSize: '13px' }}
+                      className="toolbar-input"
+                      placeholder="Tìm theo username hoặc họ tên..."
                       value={userSearchTerm}
                       onChange={(e) => setUserSearchTerm(e.target.value)}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Filter size={14} color="var(--text-secondary)" />
-                    <select 
-                      className="select-input"
+                  <div className="toolbar-filters">
+                    <select
+                      className="toolbar-select"
                       value={userRoleFilter}
                       onChange={(e) => setUserRoleFilter(e.target.value)}
-                      style={{ fontSize: '13px' }}
+                      aria-label="Lọc theo vai trò"
                     >
-                      <option value="ALL">Tất cả vai trò</option>
-                      <option value="admin">Quản trị viên (Admin)</option>
-                      <option value="user">Kỹ thuật viên (User)</option>
+                      <option value="ALL">Tất cả vai trò ({users.length})</option>
+                      <option value="admin">{ROLE_LABELS.admin} ({adminUsersCount})</option>
+                      <option value="user">{ROLE_LABELS.user} ({techUsersCount})</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Users Table */}
-                <div className="rules-table-wrap">
-                  <table className="rules-table">
-                    <colgroup>
-                      <col style={{ width: '24%' }} />
-                      <col style={{ width: '28%' }} />
-                      <col style={{ width: '20%' }} />
-                      <col style={{ width: '14%' }} />
-                      <col style={{ width: '14%' }} />
-                    </colgroup>
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
                     <thead>
                       <tr>
-                        <th>Tên đăng nhập</th>
-                        <th>Họ và tên</th>
-                        <th>Vai trò (Role)</th>
-                        <th>Trạng thái</th>
-                        <th style={{ textAlign: 'center' }}>Thao tác</th>
+                        <th style={{ width: '34%' }}>Người dùng</th>
+                        <th style={{ width: '20%' }}>Vai trò</th>
+                        <th style={{ width: '16%' }}>Trạng thái</th>
+                        <th style={{ width: '14%' }}>Ngày tạo</th>
+                        <th style={{ width: '16%', textAlign: 'right' }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
                       {loadingUsers ? (
                         <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
-                            Đang nạp danh sách tài khoản...
-                          </td>
+                          <td colSpan="5" className="table-empty">Đang tải danh sách tài khoản...</td>
                         </tr>
                       ) : filteredUsers.length === 0 ? (
                         <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
-                            Không tìm thấy người dùng nào phù hợp.
-                          </td>
+                          <td colSpan="5" className="table-empty">Không tìm thấy tài khoản phù hợp.</td>
                         </tr>
                       ) : (
                         filteredUsers.map((u) => {
-                          const isCurrentUser = user && user.username === u.username;
+                          const isSelf = user && user.username === u.username;
                           return (
                             <tr key={u.id}>
                               <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '50%',
-                                    background: u.role === 'admin' ? 'var(--coral-soft)' : 'var(--teal-soft)',
-                                    color: u.role === 'admin' ? 'var(--brand-coral)' : 'var(--brand-navy)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                  }}>
-                                    {u.role === 'admin' ? <Shield size={14} /> : <UserIcon size={14} />}
+                                <div className="user-cell">
+                                  <div className={`user-avatar ${u.role === 'admin' ? 'is-admin' : ''}`}>
+                                    {(u.full_name || u.username || 'U').charAt(0).toUpperCase()}
                                   </div>
-                                  <code className="rule-code-badge" style={{ fontWeight: 600 }}>
-                                    {u.username}
-                                  </code>
-                                  {isCurrentUser && (
-                                    <span style={{ fontSize: '10.5px', color: 'var(--brand-teal)', fontWeight: 600 }}>
-                                      (Bạn)
-                                    </span>
-                                  )}
+                                  <div className="user-cell-info">
+                                    <div className="user-cell-name">
+                                      {u.full_name || u.username}
+                                      {isSelf && <span className="self-tag">Bạn</span>}
+                                    </div>
+                                    <div className="user-cell-username">@{u.username}</div>
+                                  </div>
                                 </div>
                               </td>
                               <td>
-                                <span style={{ fontWeight: 500, color: 'var(--brand-navy)' }}>
-                                  {u.full_name || u.username}
-                                </span>
-                              </td>
-                              <td>
                                 <span className={`badge ${u.role === 'admin' ? 'badge-error' : 'badge-normal'}`}>
-                                  {u.role === 'admin' ? '🛡️ Quản trị viên' : '👨‍🌾 Kỹ thuật viên'}
+                                  {ROLE_LABELS[u.role] || u.role}
                                 </span>
                               </td>
                               <td>
-                                <span style={{ color: 'var(--success-strong)', fontSize: '12.5px', fontWeight: 500 }}>
-                                  ● Hoạt động
+                                <span className="status-inline">
+                                  <span className="status-dot online" />
+                                  <span>Hoạt động</span>
                                 </span>
                               </td>
+                              <td className="tabular-nums cell-muted">{formatDateVi(u.created_at)}</td>
                               <td>
-                                <div className="rule-actions-cell">
+                                <div className="row-actions">
                                   <button
-                                    className="btn-icon text-teal"
-                                    onClick={() => handleToggleUserRole(u)}
-                                    title={u.role === 'admin' ? 'Hạ quyền xuống Kỹ thuật viên' : 'Nâng quyền lên Quản trị viên'}
-                                    disabled={!isAdmin || isCurrentUser}
-                                  >
-                                    <ArrowRightLeft size={15} />
-                                  </button>
-                                  <button
-                                    className="btn-icon text-danger"
+                                    type="button"
+                                    className="icon-btn icon-btn-danger"
                                     onClick={() => handleDeleteUser(u)}
                                     title="Xóa tài khoản"
-                                    disabled={!isAdmin || isCurrentUser}
+                                    disabled={!isAdmin || isSelf}
                                   >
                                     <Trash2 size={15} />
                                   </button>
@@ -1026,30 +1012,43 @@ export default function AdminConsole({ user, onLogout, showToast }) {
                     </tbody>
                   </table>
                 </div>
-              </div>
 
+                <div className="table-footer">
+                  <span className="table-note">
+                    Danh sách tài khoản hiện lấy từ bộ nhớ trình duyệt khi Backend chưa có API danh sách người dùng.
+                  </span>
+                </div>
+              </section>
             </div>
           )}
-
         </main>
-
       </div>
 
-      {/* Modal Thêm/Sửa Quy tắc */}
-      <RuleModal 
+      {/* Modal Quy tắc */}
+      <RuleModal
         isOpen={ruleModalOpen}
-        onClose={() => { setRuleModalOpen(false); setEditingRule(null); }}
+        onClose={() => {
+          setRuleModalOpen(false);
+          setEditingRule(null);
+        }}
         onSave={handleSaveRule}
         initialRule={editingRule}
       />
 
-      {/* Modal Thêm Người dùng */}
-      <UserModal 
-        isOpen={userModalOpen}
-        onClose={() => setUserModalOpen(false)}
-        onSave={handleCreateUser}
+      {/* Popup xác nhận đăng xuất */}
+      <ConfirmModal
+        isOpen={logoutModalOpen}
+        title="Xác nhận đăng xuất"
+        message={`Bạn có chắc chắn muốn đăng xuất khỏi tài khoản @${user?.username || 'admin'}?`}
+        confirmLabel="Đăng xuất"
+        cancelLabel="Ở lại"
+        danger
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={() => {
+          setLogoutModalOpen(false);
+          onLogout();
+        }}
       />
-
     </div>
   );
 }

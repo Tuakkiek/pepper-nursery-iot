@@ -368,40 +368,6 @@ export const apiService = {
     return defaultUsers;
   },
 
-  async createUser(payload) {
-    // 1. Thử đăng ký tài khoản qua API Backend
-    try {
-      await authService.register(payload);
-    } catch (err) {
-      console.warn('Backend register info:', err.message);
-    }
-
-    // 2. Cập nhật danh sách người dùng quản trị
-    const users = await this.getUsers();
-    const newUser = {
-      id: Date.now(),
-      username: payload.username,
-      full_name: payload.full_name || payload.username,
-      role: payload.role || 'user',
-      created_at: new Date().toISOString(),
-      is_active: true
-    };
-    const updated = [newUser, ...users.filter(u => u.username !== payload.username)];
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('pepper_managed_users', JSON.stringify(updated));
-    }
-    return newUser;
-  },
-
-  async updateUserRole(id, newRole) {
-    const users = await this.getUsers();
-    const updated = users.map(u => u.id === id ? { ...u, role: newRole } : u);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('pepper_managed_users', JSON.stringify(updated));
-    }
-    return updated.find(u => u.id === id);
-  },
-
   async deleteUser(id) {
     const users = await this.getUsers();
     const updated = users.filter(u => u.id !== id);
