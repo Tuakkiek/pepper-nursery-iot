@@ -307,6 +307,44 @@ class _CareScreenState extends State<CareScreen> {
                   ),
                 ),
               ),
+              if (widget.apiService.currentUser?.isAdmin == true && rule.id != null) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.coralStrong),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Xóa quy tắc (Admin)',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Xác nhận xóa'),
+                        content: Text('Xóa quy tắc "${rule.name}" khỏi hệ thống?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.coralStrong),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Xóa'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      try {
+                        await widget.apiService.deleteRule(rule.id!);
+                        _loadRules();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Lỗi: $e')),
+                          );
+                        }
+                      }
+                    }
+                  },
+                ),
+              ],
             ],
           ),
           if (rule.description != null && rule.description!.isNotEmpty) ...[

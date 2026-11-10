@@ -179,6 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               configuredDeviceId: widget.apiService.deviceId,
               configuredDeviceName: widget.apiService.activeDeviceName,
               isFixtureMode: isFixture,
+              isBridgeMode: widget.apiService.mode == DataSourceMode.bridge,
               isBackendOnline: widget.apiService.isBackendOnline,
               autoRefreshEnabled: widget.apiService.autoRefresh,
               refreshIntervalSeconds: widget.apiService.refreshIntervalSeconds,

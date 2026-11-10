@@ -185,7 +185,7 @@ void main() {
     // Đồng bộ fixture
     final syncRes = await apiService.triggerThingSpeakSync();
     expect(syncRes['status'], 'ok');
-    expect(syncRes['fetched'], 10);
+    expect(syncRes['fetched'], 20);
 
     // Đăng xuất
     apiService.logout();
@@ -410,6 +410,156 @@ void main() {
     expect(afterDelete.any((d) => d.deviceId == 'esp32-khay-02'), isFalse);
     expect(apiService.deviceId, '1');
     expect(apiService.activeDeviceName, 'Trạm vườn ươm Khay A');
+  });
+
+  test('Phân tích phản hồi số đo kèm lời khuyên CareAdvice theo Hợp đồng Mục 5.1', () {
+    final contractJson = {
+      'device_id': 'esp32-nursery-01',
+      'received_at': '2026-11-10T08:02:17.717Z',
+      'is_stale': false,
+      'reading': {
+        'schema_version': '0.1',
+        'device_id': 'esp32-nursery-01',
+        'sample_id': 'sdb-entry-113',
+        'recorded_at': '2026-11-08T06:14:53.000Z',
+        'air_temperature_c': 32.7,
+        'air_humidity_pct': 69.5,
+        'soil_temperature_c': 32.0,
+        'soil_moisture_pct': 0.0,
+        'soil_moisture_raw': 4095,
+        'water_ph': 3.28,
+        'water_ph_adc_raw': 1022,
+        'water_tds_ppm': 58.5,
+        'water_tds_adc_raw': null,
+        'sensor_status': {
+          'dht22': 'ok',
+          'ds18b20': 'ok',
+          'hd38': 'ok',
+          'tds': 'ok',
+          'ph4502c': 'ok',
+        },
+      },
+      'advice': {
+        'version': '0.1',
+        'status': 'danger',
+        'priority': 2,
+        'code': 'RULE_TEMP_EXTREME_HIGH',
+        'message': 'Nhiệt độ không khí cực cao: Kéo lưới che 70% nắng, bật phun sương mái làm mát.',
+        'suggested_action': 'Kéo lưới che 70% nắng, bật phun sương mái làm mát.',
+      },
+    };
+
+    final response = LatestReadingResponse.fromJson(contractJson);
+    expect(response.deviceId, equals('esp32-nursery-01'));
+    expect(response.isStale, isFalse);
+    expect(response.reading, isNotNull);
+    expect(response.reading!.sampleId, equals('sdb-entry-113'));
+    expect(response.reading!.airTemperatureC, equals(32.7));
+    expect(response.reading!.waterPh, equals(3.28));
+
+    // Kiểm tra cấu trúc Advice
+    expect(response.advice, isNotNull);
+    expect(response.advice!.status, equals('danger'));
+    expect(response.advice!.isDanger, isTrue);
+    expect(response.advice!.code, equals('RULE_TEMP_EXTREME_HIGH'));
+    expect(response.advice!.suggestedAction, isNotNull);
+    expect(response.adviceMessage, contains('Nhiệt độ không khí cực cao'));
+  });
+
+  test('Kiểm tra chế độ dự phòng Sensor Data Bridge (Mục 7)', () {
+    expect(ApiService.sensorBridgeBaseUrl, contains('sensor-data-bridge-backend.onrender.com'));
+    expect(ApiService.sensorBridgeApiKey, startsWith('sdb_read_'));
+
+    apiService.mode = DataSourceMode.bridge;
+    expect(apiService.mode, equals(DataSourceMode.bridge));
+  });
+
+  test('Kiểm tra CRUD quy tắc chăm sóc và đồng bộ Bridge trong ApiService', () async {
+    apiService.mode = DataSourceMode.fixture;
+
+    // 1. Đồng bộ Bridge
+    final bridgeSync = await apiService.triggerBridgeSync();
+    expect(bridgeSync['status'], equals('ok'));
+    expect(bridgeSync['fetched'], equals(20));
+
+    // 2. Thêm quy tắc
+    const newRule = CareRule(
+      ruleCode: 'RULE_TEST',
+      name: 'Quy tắc thử nghiệm',
+      parameter: 'air_temperature_c',
+      operator: '>',
+      thresholdMax: 35.0,
+      actionAdvice: 'Làm mát khẩn cấp',
+    );
+    final created = await apiService.createRule(newRule);
+    expect(created.ruleCode, equals('RULE_TEST'));
+
+    // 3. Sửa quy tắc
+    final updated = await apiService.updateRule(1, newRule);
+    expect(updated.name, equals('Quy tắc thử nghiệm'));
+
+    // 4. Xóa quy tắc
+    final deleted = await apiService.deleteRule(1);
+    expect(deleted, isTrue);
+  });
+
+  test('Kiểm tra tự động đánh giá nông học cục bộ khi Backend trả về advice: null', () {
+    // Trường hợp nước tưới cực chua (pH = 4.2) như dữ liệu thực tế từ Bridge
+    final dangerousReadingJson = {
+      'device_id': '1',
+      'reading': {
+        'schema_version': '0.1',
+        'device_id': '1',
+        'sample_id': 'sdb-entry-999',
+        'recorded_at': '2026-11-10T17:00:00Z',
+        'water_ph': 4.2,
+        'soil_moisture_pct': 0.0,
+        'air_temperature_c': 30.5,
+        'air_humidity_pct': 78.0,
+      },
+      'received_at': '2026-11-10T17:00:02Z',
+      'is_stale': false,
+      'advice': null,
+    };
+
+    final res = LatestReadingResponse.fromJson(dangerousReadingJson);
+    expect(res.advice, isNotNull);
+    expect(res.advice!.isDanger, isTrue);
+    expect(res.advice!.code, equals('RULE_PH_EXTREME_ACID'));
+    expect(res.advice!.message, contains('Nước tưới cực chua'));
+    expect(res.advice!.suggestedAction, contains('nước vôi trong'));
+
+    // Trường hợp thông số lý tưởng
+    final optimalReadingJson = {
+      'device_id': 'esp32-nursery-01',
+      'reading': {
+        'schema_version': '0.1',
+        'device_id': 'esp32-nursery-01',
+        'sample_id': 'sample-opt',
+        'recorded_at': '2026-11-10T17:00:00Z',
+        'water_ph': 6.2,
+        'soil_moisture_pct': 70.0,
+        'air_temperature_c': 25.0,
+        'air_humidity_pct': 68.0,
+        'water_tds_ppm': 350.0,
+      },
+      'received_at': '2026-11-10T17:00:02Z',
+      'is_stale': false,
+      'advice': null,
+    };
+
+    final optimalRes = LatestReadingResponse.fromJson(optimalReadingJson);
+    expect(optimalRes.advice, isNotNull);
+    expect(optimalRes.advice!.isOptimal, isTrue);
+    expect(optimalRes.advice!.message, contains('điều kiện sinh trưởng lý tưởng'));
+  });
+
+  test('Kiểm tra danh sách thiết bị fetchDevices trong ApiService', () async {
+    apiService.mode = DataSourceMode.fixture;
+    final devs = await apiService.fetchDevices();
+    expect(devs, isNotEmpty);
+    expect(devs.any((d) => d.deviceId == '1'), isTrue);
+    expect(devs.any((d) => d.deviceId == 'esp32-nursery-01'), isTrue);
   });
 }
 

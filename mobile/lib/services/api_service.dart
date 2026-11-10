@@ -5,10 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../models/auth_user.dart';
 import '../models/care_rule.dart';
+import '../models/device_info.dart';
 import '../models/sensor_reading.dart';
 import '../models/user_device.dart';
 
-enum DataSourceMode { fixture, live }
+enum DataSourceMode {
+  live,    // 1. Backend Render của TDat (Khuyến nghị 100% theo mục 3)
+  bridge,  // 2. Trực tiếp Sensor Data Bridge Kênh 1 (Dự phòng theo mục 7)
+  fixture, // 3. Dữ liệu mẫu G0 (Kiểm thử ngoại tuyến)
+}
 
 enum FixtureScenario {
   normal('latest-normal.json', 'Bình thường (Đủ 5 cảm biến)'),
@@ -34,7 +39,11 @@ class ApiService extends ChangeNotifier {
   static const Duration _apiTimeout = Duration(seconds: 20);
   static const Duration _syncTimeout = Duration(seconds: 25);
 
-  DataSourceMode _mode = DataSourceMode.live; // Mặc định kết nối backend thật
+  // Sensor Data Bridge (Phương án dự phòng theo Mục 7 của hợp đồng)
+  static const String sensorBridgeBaseUrl = 'https://sensor-data-bridge-backend.onrender.com/api/v1/channels/1';
+  static const String sensorBridgeApiKey = 'sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw';
+
+  DataSourceMode _mode = DataSourceMode.live; // Mặc định kết nối backend thật TDat
   FixtureScenario _currentScenario = FixtureScenario.normal;
   late String _baseUrl;
   String _deviceId = defaultDeviceId;
@@ -75,9 +84,10 @@ class ApiService extends ChangeNotifier {
     ),
   ];
 
-  // Backend connection status
+  // Backend connection status & device registry
   bool _isBackendOnline = false;
   String? _lastHealthTimestamp;
+  List<DeviceInfo> _devices = [];
 
   // Auto-refresh state (cập nhật tự động mỗi 5s)
   Timer? _autoRefreshTimer;
@@ -106,6 +116,7 @@ class ApiService extends ChangeNotifier {
   bool get isAuthenticated => _token != null && _currentUser != null;
   bool get isBackendOnline => _isBackendOnline;
   String? get lastHealthTimestamp => _lastHealthTimestamp;
+  List<DeviceInfo> get devices => _devices;
 
   bool get autoRefresh => _autoRefresh;
   int get refreshIntervalSeconds => _refreshIntervalSeconds;
@@ -267,11 +278,47 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Lấy danh sách thiết bị từ Backend (GET /api/v1/devices)
+  Future<List<DeviceInfo>> fetchDevices() async {
+    if (_mode == DataSourceMode.fixture) {
+      _devices = [
+        const DeviceInfo(deviceId: '1', name: 'Trạm 1 (Vườn ươm Realtime)', isOnline: true, isActive: true),
+        const DeviceInfo(deviceId: 'esp32-nursery-01', name: 'esp32-nursery-01', isOnline: true),
+        const DeviceInfo(deviceId: 'esp32-stale-01', name: 'esp32-stale-01 (Dữ liệu cũ)', isOnline: false),
+        const DeviceInfo(deviceId: 'esp32-empty-01', name: 'esp32-empty-01 (Chưa có số đo)', isOnline: false),
+      ];
+      notifyListeners();
+      return _devices;
+    }
+
+    try {
+      final uri = Uri.parse('$_baseUrl/api/v1/devices');
+      final response = await http
+          .get(uri, headers: _getHeaders())
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = (data['devices'] as List<dynamic>?) ?? [];
+        _devices = list.map((item) => DeviceInfo.fromJson(item as Map<String, dynamic>)).toList();
+        notifyListeners();
+        return _devices;
+      }
+    } catch (_) {
+      // Khi không tải được danh sách thì giữ nguyên danh sách hiện thời
+    }
+    return _devices;
+  }
+
   /// 2. Lấy số đo mới nhất (GET /api/v1/devices/{device_id}/readings/latest)
   Future<LatestReadingResponse> fetchLatestReading() async {
-    final result = _mode == DataSourceMode.fixture
-        ? await _loadFixture(_currentScenario.filename)
-        : await _fetchFromApi();
+    LatestReadingResponse result;
+    if (_mode == DataSourceMode.fixture) {
+      result = await _loadFixture(_currentScenario.filename);
+    } else if (_mode == DataSourceMode.bridge) {
+      result = await _fetchFromSensorBridge();
+    } else {
+      result = await _fetchFromApi();
+    }
     _latestReading = result;
     final fetchedName = result.deviceName?.trim();
     if (fetchedName != null && fetchedName.isNotEmpty) {
@@ -311,6 +358,12 @@ class ApiService extends ChangeNotifier {
           .get(uri, headers: _getHeaders(includeContentType: false))
           .timeout(_apiTimeout);
     } catch (e) {
+      // Phương án dự phòng Mục 7: Tự động chuyển sang Sensor Data Bridge khi Backend timeout/lỗi kết nối
+      if (_deviceId == '1' || _deviceId == 'esp32-nursery-01') {
+        try {
+          return await _fetchFromSensorBridge();
+        } catch (_) {}
+      }
       _isBackendOnline = false;
       _autoRefreshError = e.toString().replaceFirst('Exception: ', '');
       rethrow;
@@ -335,6 +388,86 @@ class ApiService extends ChangeNotifier {
     }
   }
 
+  /// Dự phòng Mục 7: Đọc trực tiếp số đo từ Sensor Data Bridge Kênh 1
+  Future<LatestReadingResponse> _fetchFromSensorBridge() async {
+    final uri = Uri.parse('$sensorBridgeBaseUrl/feeds?limit=1');
+    try {
+      final response = await http.get(uri, headers: {
+        'X-API-Key': sensorBridgeApiKey,
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        _isBackendOnline = true;
+        final data = jsonDecode(response.body);
+        final feeds = (data['feeds'] as List<dynamic>?) ?? [];
+        if (feeds.isEmpty) {
+          return LatestReadingResponse(
+            deviceId: _deviceId,
+            isStale: true,
+            advice: const CareAdvice(
+              status: 'optimal',
+              message: 'Sensor Data Bridge chưa có bản ghi nào.',
+            ),
+          );
+        }
+        final latestFeed = feeds.last as Map<String, dynamic>;
+        final reading = _mapBridgeFeedToReading(latestFeed);
+
+        final diffMinutes = reading.recordedAt != null
+            ? DateTime.now().difference(reading.recordedAt!.toLocal()).inMinutes
+            : null;
+        final isStale = diffMinutes != null ? diffMinutes > 5 : false;
+
+        return LatestReadingResponse(
+          deviceId: _deviceId,
+          reading: reading,
+          receivedAt: DateTime.now(),
+          isStale: isStale,
+          advice: CareAdvice(
+            status: isStale ? 'warning' : 'optimal',
+            message: isStale
+                ? 'Dữ liệu từ Sensor Data Bridge đã cũ (> 5 phút).'
+                : 'Đang kết nối dự phòng trực tiếp Sensor Data Bridge (Kênh 1).',
+          ),
+        );
+      } else {
+        throw Exception('Sensor Data Bridge phản hồi mã lỗi: ${response.statusCode}');
+      }
+    } catch (e) {
+      _isBackendOnline = false;
+      rethrow;
+    }
+  }
+
+  ReadingData _mapBridgeFeedToReading(Map<String, dynamic> feed) {
+    final values = (feed['values'] as Map<String, dynamic>?) ?? {};
+    final recordedAtStr = feed['received_at'] as String?;
+    final recordedAt = recordedAtStr != null ? DateTime.tryParse(recordedAtStr) : null;
+
+    return ReadingData(
+      schemaVersion: '0.1',
+      deviceId: _deviceId,
+      sampleId: 'sdb-entry-${feed['id']}',
+      recordedAt: recordedAt,
+      airTemperatureC: (values['field1'] as num?)?.toDouble(),
+      airHumidityPct: (values['field2'] as num?)?.toDouble(),
+      soilTemperatureC: (values['field3'] as num?)?.toDouble(),
+      soilMoisturePct: (values['field4'] as num?)?.toDouble(),
+      waterPh: (values['field5'] as num?)?.toDouble(),
+      waterTdsPpm: (values['field6'] as num?)?.toDouble(),
+      soilMoistureRaw: (values['field7'] as num?)?.toInt(),
+      waterPhAdcRaw: (values['field8'] as num?)?.toInt(),
+      sensorStatus: const SensorStatus(
+        dht22: 'ok',
+        ds18b20: 'ok',
+        hd38: 'ok',
+        tds: 'ok',
+        ph4502c: 'ok',
+      ),
+    );
+  }
+
   /// 3. Lấy lịch sử số đo (GET /api/v1/devices/{device_id}/readings?limit=20)
   Future<List<HistoryItem>> fetchHistory({int limit = 20}) async {
     if (_mode == DataSourceMode.fixture) {
@@ -342,6 +475,8 @@ class ApiService extends ChangeNotifier {
       final data = jsonDecode(jsonStr);
       final historyResponse = HistoryResponse.fromJson(data as Map<String, dynamic>);
       return historyResponse.readings;
+    } else if (_mode == DataSourceMode.bridge) {
+      return _fetchHistoryFromSensorBridge(limit: limit);
     } else {
       final encodedId = Uri.encodeComponent(_deviceId);
       final uri = Uri.parse('$_baseUrl/api/v1/devices/$encodedId/readings?limit=$limit');
@@ -351,7 +486,12 @@ class ApiService extends ChangeNotifier {
         response = await http
             .get(uri, headers: _getHeaders(includeContentType: false))
             .timeout(_apiTimeout);
-      } catch (_) {
+      } catch (e) {
+        if (_deviceId == '1' || _deviceId == 'esp32-nursery-01') {
+          try {
+            return await _fetchHistoryFromSensorBridge(limit: limit);
+          } catch (_) {}
+        }
         _isBackendOnline = false;
         rethrow;
       }
@@ -465,6 +605,35 @@ class ApiService extends ChangeNotifier {
       return RangeReadingsResponse.fromJson(data);
     } else {
       throw Exception(_extractErrorMessage(response, 'Không tải được dữ liệu theo khoảng thời gian'));
+    }
+  }
+
+  Future<List<HistoryItem>> _fetchHistoryFromSensorBridge({int limit = 20}) async {
+    final uri = Uri.parse('$sensorBridgeBaseUrl/feeds?limit=$limit');
+    try {
+      final response = await http.get(uri, headers: {
+        'X-API-Key': sensorBridgeApiKey,
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        _isBackendOnline = true;
+        final data = jsonDecode(response.body);
+        final feeds = (data['feeds'] as List<dynamic>?) ?? [];
+        return feeds.reversed.map((f) {
+          final feedMap = f as Map<String, dynamic>;
+          final reading = _mapBridgeFeedToReading(feedMap);
+          return HistoryItem(
+            reading: reading,
+            receivedAt: reading.recordedAt,
+          );
+        }).toList();
+      } else {
+        throw Exception('Không tải được lịch sử từ Bridge: ${response.statusCode}');
+      }
+    } catch (e) {
+      _isBackendOnline = false;
+      rethrow;
     }
   }
 
@@ -1342,9 +1511,9 @@ class ApiService extends ChangeNotifier {
       return {
         'status': 'ok',
         'message': 'Đồng bộ mô phỏng (Fixture)',
-        'fetched': 10,
-        'created': 2,
-        'duplicates': 8,
+        'fetched': 20,
+        'created': 1,
+        'duplicates': 19,
       };
     }
 
@@ -1365,12 +1534,146 @@ class ApiService extends ChangeNotifier {
       await pollLatestReading();
       return result;
     } else {
-      throw Exception(_extractErrorMessage(response, 'Đồng bộ Sensor Data Bridge lỗi'));
+      throw Exception(_extractErrorMessage(response, 'Đồng bộ Bridge lỗi'));
     }
   }
 
-  /// Alias tương thích ngược cho các lời gọi cũ
+  /// Tương thích ngược: Alias cho triggerBridgeSync
   Future<Map<String, dynamic>> triggerThingSpeakSync() => triggerBridgeSync();
+
+  /// 8. Lấy trạng thái Sensor Data Bridge (GET /api/v1/sync/bridge/status)
+  Future<Map<String, dynamic>> getBridgeStatus() async {
+    if (_mode == DataSourceMode.fixture) {
+      return {
+        'status': 'ok',
+        'channel_id': 1,
+        'is_running': true,
+        'provider': 'sensor-data-bridge',
+      };
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/v1/sync/bridge/status');
+    final response = await http.get(uri).timeout(const Duration(seconds: 6));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Không lấy được trạng thái Bridge');
+  }
+
+  /// 9. Kiểm tra phiên người dùng (GET /api/v1/auth/me)
+  Future<AuthUser?> checkCurrentUser() async {
+    if (_token == null) return null;
+    if (_mode == DataSourceMode.fixture) return _currentUser;
+
+    try {
+      final uri = Uri.parse('$_baseUrl/api/v1/auth/me');
+      final response = await http
+          .get(uri, headers: _getHeaders())
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _currentUser = AuthUser.fromJson(data['user'] as Map<String, dynamic>);
+        notifyListeners();
+        return _currentUser;
+      } else {
+        logout();
+        return null;
+      }
+    } catch (_) {
+      return _currentUser;
+    }
+  }
+
+  /// 10. Thêm quy tắc chăm sóc mới (POST /api/v1/rules) - Chỉ Admin
+  Future<CareRule> createRule(CareRule rule) async {
+    if (_mode == DataSourceMode.fixture) {
+      notifyListeners();
+      return rule;
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/v1/rules');
+    final body = jsonEncode({
+      'rule_code': rule.ruleCode,
+      'name': rule.name,
+      'description': rule.description,
+      'parameter': rule.parameter,
+      'operator': rule.operator,
+      'threshold_min': rule.thresholdMin,
+      'threshold_max': rule.thresholdMax,
+      'severity': rule.severity,
+      'action_advice': rule.actionAdvice,
+      'is_active': rule.isActive,
+    });
+
+    final response = await http
+        .post(uri, headers: _getHeaders(), body: body)
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final newRule = CareRule.fromJson(data['rule'] ?? data);
+      notifyListeners();
+      return newRule;
+    } else {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error']?['message'] ?? 'Thêm quy tắc thất bại');
+    }
+  }
+
+  /// 11. Chỉnh sửa quy tắc (PUT /api/v1/rules/:id) - Chỉ Admin
+  Future<CareRule> updateRule(int id, CareRule rule) async {
+    if (_mode == DataSourceMode.fixture) {
+      notifyListeners();
+      return rule;
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/v1/rules/$id');
+    final body = jsonEncode({
+      'name': rule.name,
+      'description': rule.description,
+      'threshold_min': rule.thresholdMin,
+      'threshold_max': rule.thresholdMax,
+      'severity': rule.severity,
+      'action_advice': rule.actionAdvice,
+      'is_active': rule.isActive,
+    });
+
+    final response = await http
+        .put(uri, headers: _getHeaders(), body: body)
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final updated = CareRule.fromJson(data['rule'] ?? data);
+      notifyListeners();
+      return updated;
+    } else {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error']?['message'] ?? 'Cập nhật quy tắc thất bại');
+    }
+  }
+
+  /// 12. Xóa quy tắc (DELETE /api/v1/rules/:id) - Chỉ Admin
+  Future<bool> deleteRule(int id) async {
+    if (_mode == DataSourceMode.fixture) {
+      notifyListeners();
+      return true;
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/v1/rules/$id');
+    final response = await http
+        .delete(uri, headers: _getHeaders())
+        .timeout(const Duration(seconds: 8));
+
+    if (response.statusCode == 200) {
+      notifyListeners();
+      return true;
+    } else {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error']?['message'] ?? 'Xóa quy tắc thất bại');
+    }
+  }
 
   @override
   void dispose() {

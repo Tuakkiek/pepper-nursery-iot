@@ -8,6 +8,7 @@ class DeviceStatusCard extends StatelessWidget {
   final String configuredDeviceId;
   final String? configuredDeviceName;
   final bool isFixtureMode;
+  final bool isBridgeMode;
   final bool isBackendOnline;
   final bool autoRefreshEnabled;
   final int refreshIntervalSeconds;
@@ -20,6 +21,7 @@ class DeviceStatusCard extends StatelessWidget {
     this.configuredDeviceId = '1',
     this.configuredDeviceName,
     required this.isFixtureMode,
+    this.isBridgeMode = false,
     this.isBackendOnline = false,
     this.autoRefreshEnabled = true,
     this.refreshIntervalSeconds = 5,
@@ -151,13 +153,17 @@ class DeviceStatusCard extends StatelessWidget {
                           child: Text(
                             isFixtureMode
                                 ? 'Dữ liệu mẫu'
-                                : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API'),
+                                : (isBridgeMode
+                                    ? '● Sensor Bridge'
+                                    : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API')),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: isFixtureMode
                                   ? AppColors.textSecondary
-                                  : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong),
+                                  : (isBridgeMode
+                                      ? const Color(0xFF856404)
+                                      : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong)),
                             ),
                           ),
                         ),
