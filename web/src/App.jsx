@@ -31,7 +31,6 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Xác thực lại phiên Admin khi tải trang
   useEffect(() => {
     authService.verifySession().then(u => {
       if (u && u.role === 'admin') {
@@ -64,13 +63,13 @@ export default function App() {
   }
 
   return (
-    <div className="app-wrapper">
+    <>
       <AdminConsole
         user={user}
         onLogout={handleLogout}
         showToast={showToast}
       />
       <Toast toasts={toasts} onDismiss={dismissToast} />
-    </div>
+    </>
   );
 }
