@@ -25,6 +25,29 @@ export interface HistoryResponse {
   readings: HistoryItem[];
 }
 
+export interface RangeResponse {
+  device_id: string;
+  start_date: string;
+  end_date: string;
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  readings: HistoryItem[];
+}
+
+export interface HistoryQueryOptions {
+  limit?: number;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  tz?: string;
+  order?: 'desc' | 'asc';
+  page?: number;
+  page_size?: number;
+}
+
 export function computePayloadHash(dto: IngestReadingDto): string {
   // Canonical string: sort keys to ensure stable hash
   const canonicalObj = {
@@ -61,11 +84,13 @@ export function formatUtcIso(d: Date | string | null): string | null {
 
 export class ReadingService {
   private fallbackLatestGetter: ((deviceId: string) => IngestReadingDto | null) | null = null;
-  private fallbackHistoryGetter: ((deviceId: string, limit: number) => HistoryItem[] | null) | null = null;
+  private fallbackHistoryGetter: (
+    (deviceId: string, limit: number, options?: HistoryQueryOptions) => HistoryItem[] | null
+  ) | null = null;
 
   setFallbackGetters(
     latest: (deviceId: string) => IngestReadingDto | null,
-    history: (deviceId: string, limit: number) => HistoryItem[] | null
+    history: (deviceId: string, limit: number, options?: HistoryQueryOptions) => HistoryItem[] | null
   ) {
     this.fallbackLatestGetter = latest;
     this.fallbackHistoryGetter = history;
@@ -286,6 +311,121 @@ export class ReadingService {
     return {
       device_id: deviceId,
       limit,
+      readings: items,
+    };
+  }
+
+  async getRangeReadings(
+    deviceId: string,
+    options: {
+      start_date: string;
+      end_date: string;
+      start_time?: string;
+      end_time?: string;
+      tz?: string;
+      order?: 'desc' | 'asc';
+      page?: number;
+      page_size?: number;
+      limit?: number;
+    }
+  ): Promise<RangeResponse | null> {
+    const exists = await this.deviceExists(deviceId);
+    if (!exists) {
+      return null;
+    }
+
+    const page = Math.max(1, options.page || 1);
+    const pageSize = Math.min(100, Math.max(1, options.page_size || 20));
+    const order = options.order === 'asc' ? 'ASC' : 'DESC';
+
+    const startTime = options.start_time || '00:00:00';
+    const endTime = options.end_time || '23:59:59';
+    const startIso = `${options.start_date} ${startTime}`;
+    const endIso = `${options.end_date} ${endTime}`;
+
+    // Try DB query first
+    const [countRows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as cnt
+       FROM readings
+       WHERE device_id = ?
+         AND (
+           (recorded_at IS NOT NULL AND recorded_at >= ? AND recorded_at <= ?)
+           OR (recorded_at IS NULL AND received_at >= ? AND received_at <= ?)
+         )`,
+      [deviceId, startIso, endIso, startIso, endIso]
+    );
+
+    const dbTotal = Number((countRows[0] as any)?.cnt || 0);
+
+    // If no DB rows found, try fallback from sensor-bridge cache
+    if (dbTotal === 0 && this.fallbackHistoryGetter) {
+      const allCached = this.fallbackHistoryGetter(deviceId, 1000, {
+        start_date: options.start_date,
+        end_date: options.end_date,
+        start_time: options.start_time,
+        end_time: options.end_time,
+        order: options.order,
+      });
+
+      if (allCached) {
+        const total = allCached.length;
+        const totalPages = Math.ceil(total / pageSize) || 1;
+        const offset = (page - 1) * pageSize;
+        const pagedReadings = options.limit
+          ? allCached.slice(0, Math.min(options.limit, pageSize))
+          : allCached.slice(offset, offset + pageSize);
+
+        return {
+          device_id: deviceId,
+          start_date: options.start_date,
+          end_date: options.end_date,
+          total,
+          page,
+          page_size: pageSize,
+          total_pages: totalPages,
+          readings: pagedReadings,
+        };
+      }
+    }
+
+    const offset = (page - 1) * pageSize;
+    const fetchLimit = options.limit ? Math.min(options.limit, pageSize) : pageSize;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT raw_payload, received_at
+       FROM readings
+       WHERE device_id = ?
+         AND (
+           (recorded_at IS NOT NULL AND recorded_at >= ? AND recorded_at <= ?)
+           OR (recorded_at IS NULL AND received_at >= ? AND received_at <= ?)
+         )
+       ORDER BY COALESCE(recorded_at, received_at) ${order}
+       LIMIT ? OFFSET ?`,
+      [deviceId, startIso, endIso, startIso, endIso, fetchLimit, offset]
+    );
+
+    const items: HistoryItem[] = rows.map((r) => {
+      const reading: IngestReadingDto =
+        typeof r.raw_payload === 'string' ? JSON.parse(r.raw_payload) : r.raw_payload;
+      if (reading && reading.recorded_at) {
+        reading.recorded_at = formatUtcIso(reading.recorded_at);
+      }
+      return {
+        reading,
+        received_at: formatUtcIso(r.received_at)!,
+      };
+    });
+
+    const totalPages = Math.ceil(dbTotal / pageSize) || 1;
+
+    return {
+      device_id: deviceId,
+      start_date: options.start_date,
+      end_date: options.end_date,
+      total: dbTotal,
+      page,
+      page_size: pageSize,
+      total_pages: totalPages,
       readings: items,
     };
   }

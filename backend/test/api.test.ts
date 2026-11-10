@@ -83,6 +83,25 @@ async function runTests() {
       console.log('✓ GET history readings with limit passed');
     }
 
+    // 5b. Test GET /api/v1/devices/esp32-nursery-01/readings/range (Date range filtering)
+    {
+      const res = await request(
+        '/api/v1/devices/esp32-nursery-01/readings/range?start_date=2026-01-01&end_date=2026-12-31'
+      );
+      console.assert(res.status === 200, `Range expected 200, got ${res.status}`);
+      console.assert(res.body.device_id === 'esp32-nursery-01', 'device_id match');
+      console.assert(Array.isArray(res.body.readings), 'readings should be array');
+      console.assert(res.body.total >= 0, 'total should be non-negative');
+      console.log('✓ GET range readings with start_date & end_date passed');
+    }
+
+    // 5c. Test GET /api/v1/devices/esp32-nursery-01/readings/range missing params -> 422
+    {
+      const res = await request('/api/v1/devices/esp32-nursery-01/readings/range');
+      console.assert(res.status === 422, `Missing range params expected 422, got ${res.status}`);
+      console.log('✓ GET range readings without dates returns 422 passed');
+    }
+
     // 6. Test POST /api/v1/readings (New reading -> 201 Created)
     const testSampleId = `sample-test-${Date.now()}`;
     const newPayload = {
