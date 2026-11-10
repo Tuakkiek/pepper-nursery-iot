@@ -98,11 +98,12 @@ export class ReadingService {
   }
 
   async ensureDevice(deviceId: string, name?: string): Promise<void> {
+    const initialName = name || deviceId;
     await pool.query(
       `INSERT INTO devices (device_id, name)
        VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE name = COALESCE(VALUES(name), name)`,
-      [deviceId, name || deviceId]
+       ON DUPLICATE KEY UPDATE name = IF(name IS NULL OR TRIM(name) = '', ?, name)`,
+      [deviceId, initialName, initialName]
     );
   }
 
@@ -186,6 +187,28 @@ export class ReadingService {
       device_id: data.device_id,
       name: data.name,
       description: data.description || null,
+    };
+  }
+
+  async deleteDevice(
+    deviceId: string
+  ): Promise<{ status: 'ok' | 'not_found'; message: string; deleted_device_id?: string }> {
+    const dev = await this.resolveDevice(deviceId);
+    if (!dev) {
+      return { status: 'not_found', message: `Device '${deviceId}' does not exist` };
+    }
+
+    await pool.query(
+      `UPDATE users SET selected_device_id = NULL WHERE selected_device_id = ?`,
+      [dev.device_id]
+    );
+    await pool.query(`DELETE FROM readings WHERE device_id = ?`, [dev.device_id]);
+    await pool.query(`DELETE FROM devices WHERE device_id = ?`, [dev.device_id]);
+
+    return {
+      status: 'ok',
+      message: 'Device deleted successfully',
+      deleted_device_id: dev.device_id,
     };
   }
 

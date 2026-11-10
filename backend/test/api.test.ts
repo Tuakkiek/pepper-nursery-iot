@@ -310,7 +310,43 @@ async function runTests() {
       });
       console.assert(res.status === 200, `Rename device expected 200, got ${res.status}`);
       console.assert(res.body.device.name === 'Vườn ươm ớt Siêu Cay Khay 1', 'name updated');
-      console.log('✓ PATCH /user/devices/:id (rename display name) passed');
+
+      // Telemetry ingestion must NOT overwrite custom device name
+      const ingestRes = await request('/api/v1/readings', {
+        method: 'POST',
+        body: {
+          schema_version: '0.1',
+          device_id: '1',
+          sample_id: 'preserve-name-test-001',
+          recorded_at: new Date().toISOString(),
+          air_temperature_c: 29.0,
+          air_humidity_pct: 75.0,
+          soil_temperature_c: 27.0,
+          soil_moisture_raw: 1800,
+          soil_moisture_pct: 55.0,
+          water_tds_adc_raw: 1400,
+          water_tds_ppm: 500.0,
+          water_ph_adc_raw: 1900,
+          water_ph: 6.4,
+          sensor_status: {
+            dht22: 'ok',
+            hd38: 'ok',
+            ds18b20: 'ok',
+            tds: 'ok',
+            ph4502c: 'ok',
+          },
+        },
+      });
+      console.assert(
+        ingestRes.status === 200 || ingestRes.status === 201,
+        `Ingest reading expected 200/201, got ${ingestRes.status}`
+      );
+      const afterIngest = await request('/api/v1/devices/1');
+      console.assert(
+        afterIngest.body.device.name === 'Vườn ươm ớt Siêu Cay Khay 1',
+        'device custom name must persist after ingestReading'
+      );
+      console.log('✓ PATCH /user/devices/:id (rename display name & persist after ingest) passed');
     }
 
     // 14i. Test Claim Conflict: Admin cannot claim device '1' while owned by user
@@ -333,6 +369,25 @@ async function runTests() {
       });
       console.assert(res.status === 200, `Remove device expected 200, got ${res.status}`);
       console.log('✓ DELETE /user/devices/:id (remove device from account) passed');
+    }
+
+    // 14k. Test Public Device Create & Delete: POST /api/v1/devices -> DELETE /api/v1/devices/:id
+    {
+      const createRes = await request('/api/v1/devices', {
+        method: 'POST',
+        body: { device_id: 'esp32-temp-delete', name: 'Trạm Tạm Xóa' },
+      });
+      console.assert(createRes.status === 201, `Create temp device expected 201, got ${createRes.status}`);
+
+      const deleteRes = await request('/api/v1/devices/esp32-temp-delete', {
+        method: 'DELETE',
+      });
+      console.assert(deleteRes.status === 200, `Delete temp device expected 200, got ${deleteRes.status}`);
+      console.assert(deleteRes.body.deleted_device_id === 'esp32-temp-delete', 'deleted_device_id match');
+
+      const detailRes = await request('/api/v1/devices/esp32-temp-delete');
+      console.assert(detailRes.status === 404, `Deleted device detail expected 404, got ${detailRes.status}`);
+      console.log('✓ POST /devices & DELETE /devices/:id passed');
     }
 
     // 15. Test Rules: GET /api/v1/rules

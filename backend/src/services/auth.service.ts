@@ -144,7 +144,7 @@ export class AuthService {
       await pool.query(
         `INSERT INTO devices (device_id, name, description)
          VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE name = VALUES(name)`,
+         ON DUPLICATE KEY UPDATE name = IF(name IS NULL OR TRIM(name) = '', VALUES(name), name)`,
         [newDeviceId, newDeviceName, `Thiết bị liên kết từ API read (${rawInput})`]
       );
       device = {

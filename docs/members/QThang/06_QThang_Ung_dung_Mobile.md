@@ -109,12 +109,12 @@ Schema đề xuất G0 v0.1 nằm trong `docs/contracts/api.md` và `docs/contra
 
 ## 4. Checklist bàn giao cho TKiet và TDat
 
-- [ ] Mã ứng dụng, fixture và hướng dẫn nằm trong `mobile/`; có cấu hình API cho điện thoại thật.
-- [ ] Có màn hình cho số đo mới nhất, lịch sử và trạng thái thiết bị theo phạm vi G0.
-- [ ] Có fixture cho bình thường, chưa có dữ liệu, lỗi một cảm biến, chưa hiệu chuẩn, dữ liệu cũ và lỗi server.
-- [ ] Giá trị `0` hợp lệ khác `null`; số đọc thô HD‑38/TDS/pH không được gắn %, ppm hoặc pH nếu chưa hiệu chuẩn.
-- [ ] Thời điểm đo/nhận và dữ liệu cũ/bản lưu trên máy được ghi nhãn đúng hợp đồng.
-- [ ] Nội dung chăm sóc do MThuy duyệt; không có ngưỡng hoặc thông báo đẩy tự thêm ngoài phạm vi.
-- [ ] TDat xác nhận response/API, DKhoa xác nhận ngữ nghĩa trạng thái, TKiet xác nhận luồng đo thật tới mobile.
+- [x] Mã ứng dụng, fixture và hướng dẫn nằm trong `mobile/`; có cấu hình API mặc định kết nối Cloud Render (`https://pepper-nursery-iot.onrender.com`) cho điện thoại thật và giả lập.
+- [x] Có màn hình cho số đo mới nhất, lịch sử và trạng thái thiết bị theo phạm vi G0.
+- [x] Có fixture cho bình thường, chưa có dữ liệu, lỗi một cảm biến, chưa hiệu chuẩn, dữ liệu cũ và lỗi server.
+- [x] Giá trị `0` hợp lệ khác `null`; số đọc thô HD‑38/TDS/pH không được gắn %, ppm hoặc pH nếu chưa hiệu chuẩn.
+- [x] Thời điểm đo/nhận và dữ liệu cũ/bản lưu trên máy được ghi nhãn đúng hợp đồng.
+- [x] Nội dung chăm sóc do MThuy duyệt; không có ngưỡng hoặc thông báo đẩy tự thêm ngoài phạm vi.
+- [x] TDat xác nhận response/API, DKhoa xác nhận ngữ nghĩa trạng thái, TKiet xác nhận luồng đo thật tới mobile.
 
 **Khi bị chặn:** Backend chưa chạy thì tiếp tục bằng fixture G0 và đánh dấu tích hợp API thật là `đang chặn`. Nếu điện thoại không truy cập được server thử, gửi TKiet/TDat địa chỉ, lỗi và cách tái hiện. Nếu schema đổi, nêu response trước/sau và tác động tới màn hình cho TKiet/TDat/DKhoa/MThuy; chờ hợp đồng chung được cập nhật rồi mới thay cách diễn giải.

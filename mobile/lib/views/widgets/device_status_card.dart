@@ -5,20 +5,28 @@ import '../../models/sensor_reading.dart';
 
 class DeviceStatusCard extends StatelessWidget {
   final LatestReadingResponse? latestData;
+  final String configuredDeviceId;
+  final String? configuredDeviceName;
   final bool isFixtureMode;
+  final bool isBridgeMode;
   final bool isBackendOnline;
   final bool autoRefreshEnabled;
   final int refreshIntervalSeconds;
-  final VoidCallback? onConfigure;
+  final String? syncError;
+  final VoidCallback? onManageDevice;
 
   const DeviceStatusCard({
     super.key,
     required this.latestData,
+    this.configuredDeviceId = '1',
+    this.configuredDeviceName,
     required this.isFixtureMode,
+    this.isBridgeMode = false,
     this.isBackendOnline = false,
     this.autoRefreshEnabled = true,
-    this.refreshIntervalSeconds = 3,
-    this.onConfigure,
+    this.refreshIntervalSeconds = 5,
+    this.syncError,
+    this.onManageDevice,
   });
 
   String _formatTime(DateTime? dt) {
@@ -30,7 +38,19 @@ class DeviceStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final reading = latestData?.reading;
     final isStale = latestData?.isStale;
-    final deviceId = latestData?.deviceId ?? 'esp32-nursery-01';
+    final deviceId = configuredDeviceId.trim().isNotEmpty
+        ? configuredDeviceId.trim()
+        : ((latestData?.deviceId.isNotEmpty ?? false)
+            ? latestData!.deviceId
+            : '1');
+    final preferredName = configuredDeviceName?.trim();
+    final responseName = latestData?.deviceName?.trim();
+    final rawName = (preferredName != null && preferredName.isNotEmpty)
+        ? preferredName
+        : (responseName ?? '');
+    final displayDeviceTitle = (rawName.isNotEmpty && rawName != deviceId)
+        ? rawName
+        : 'Trạm $deviceId';
 
     Color cardBg;
     Color borderColor;
@@ -94,20 +114,35 @@ class DeviceStatusCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Flexible(
-                          child: Text(
-                            deviceId,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.navy,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          displayDeviceTitle,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.navy,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.space2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.cream,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            'ID: $deviceId',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navy,
+                            ),
+                          ),
+                        ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -118,18 +153,21 @@ class DeviceStatusCard extends StatelessWidget {
                           child: Text(
                             isFixtureMode
                                 ? 'Dữ liệu mẫu'
-                                : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API'),
+                                : (isBridgeMode
+                                    ? '● Sensor Bridge'
+                                    : (isBackendOnline ? '● Backend Live' : '○ Mất kết nối API')),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: isFixtureMode
                                   ? AppColors.textSecondary
-                                  : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong),
+                                  : (isBridgeMode
+                                      ? const Color(0xFF856404)
+                                      : (isBackendOnline ? const Color(0xFF155724) : AppColors.coralStrong)),
                             ),
                           ),
                         ),
-                        if (autoRefreshEnabled) ...[
-                          const SizedBox(width: AppSpacing.space1),
+                        if (autoRefreshEnabled)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -152,10 +190,9 @@ class DeviceStatusCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                        ],
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       statusTitle,
                       style: TextStyle(
@@ -167,12 +204,25 @@ class DeviceStatusCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onConfigure != null)
-                IconButton(
-                  icon: const Icon(Icons.tune, size: 20, color: AppColors.navy),
-                  tooltip: 'Cài đặt kết nối',
-                  onPressed: onConfigure,
+              if (onManageDevice != null) ...[
+                const SizedBox(width: AppSpacing.space1),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    backgroundColor: AppColors.surface,
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(0, 34),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.developer_board, size: 16),
+                  label: const Text(
+                    'Thiết bị',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: onManageDevice,
                 ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.space2),
@@ -183,6 +233,17 @@ class DeviceStatusCard extends StatelessWidget {
               color: isStale == true ? AppColors.coralStrong : AppColors.textSecondary,
             ),
           ),
+          if (syncError != null && syncError!.isNotEmpty && !isFixtureMode) ...[
+            const SizedBox(height: AppSpacing.space1),
+            Text(
+              'Không thể làm mới từ server (đang giữ bản gần nhất): $syncError',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.coralStrong,
+              ),
+            ),
+          ],
         ],
       ),
     );

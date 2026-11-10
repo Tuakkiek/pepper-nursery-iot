@@ -1,32 +1,139 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:device_preview/device_preview.dart';
+
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_theme.dart';
 import 'models/sensor_reading.dart';
 import 'services/api_service.dart';
+import 'views/screens/account_screen.dart';
 import 'views/screens/care_screen.dart';
 import 'views/screens/dashboard_screen.dart';
 import 'views/screens/history_screen.dart';
+import 'views/screens/login_screen.dart';
 
 void main() {
-  runApp(const PepperNurseryApp());
+  runApp(
+    DevicePreview(
+      enabled: !kReleaseMode,
+      builder: (context) => const PepperNurseryApp(),
+    ),
+  );
 }
 
-class PepperNurseryApp extends StatelessWidget {
-  const PepperNurseryApp({super.key});
+class PepperNurseryApp extends StatefulWidget {
+  final ApiService? apiService;
+  final bool skipAuthGate;
+
+  const PepperNurseryApp({
+    super.key,
+    this.apiService,
+    this.skipAuthGate = false,
+  });
+
+  @override
+  State<PepperNurseryApp> createState() => _PepperNurseryAppState();
+}
+
+class _PepperNurseryAppState extends State<PepperNurseryApp> {
+  ApiService? _apiService;
+  bool _ownsApiService = false;
+  bool _isGuestMode = false;
+  bool _lastIsAuthenticated = false;
+
+  ApiService get _service {
+    if (_apiService == null) {
+      _ownsApiService = widget.apiService == null;
+      _apiService = widget.apiService ?? ApiService();
+      _lastIsAuthenticated = _apiService!.isAuthenticated;
+      _apiService!.addListener(_onServiceChanged);
+    }
+    return _apiService!;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _service;
+  }
+
+  @override
+  void dispose() {
+    final service = _apiService;
+    if (service != null) {
+      service.removeListener(_onServiceChanged);
+      if (_ownsApiService) {
+        service.dispose();
+      }
+    }
+    super.dispose();
+  }
+
+  void _onServiceChanged() {
+    final isAuthenticated = _service.isAuthenticated;
+    if (_lastIsAuthenticated != isAuthenticated) {
+      _lastIsAuthenticated = isAuthenticated;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  void _enterGuestMode() {
+    setState(() {
+      _isGuestMode = true;
+    });
+  }
+
+  void _openLoginScreen() {
+    setState(() {
+      _isGuestMode = false;
+    });
+  }
+
+  void _handleLogout() {
+    setState(() {
+      _isGuestMode = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final service = _service;
+    final showMainApp =
+        widget.skipAuthGate || service.isAuthenticated || _isGuestMode;
+
     return MaterialApp(
       title: 'Vườn Ươm Ớt Con',
       debugShowCheckedModeBanner: false,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
       theme: AppTheme.lightTheme,
-      home: const MainNavigationScreen(),
+      home: showMainApp
+          ? MainNavigationScreen(
+              apiService: service,
+              onOpenLogin: _openLoginScreen,
+              onLogout: _handleLogout,
+            )
+          : LoginScreen(
+              apiService: service,
+              onContinueAsGuest: _enterGuestMode,
+            ),
     );
   }
 }
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final ApiService? apiService;
+  final VoidCallback? onOpenLogin;
+  final VoidCallback? onLogout;
+
+  const MainNavigationScreen({
+    super.key,
+    this.apiService,
+    this.onOpenLogin,
+    this.onLogout,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -34,69 +141,71 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-  late final ApiService _apiService;
+  ApiService? _apiService;
+  bool _ownsApiService = false;
   LatestReadingResponse? _cachedLatestData;
+
+  ApiService get _service {
+    if (_apiService == null) {
+      _ownsApiService = widget.apiService == null;
+      _apiService = widget.apiService ?? ApiService();
+      _cachedLatestData = _apiService!.latestReading;
+      _apiService!.checkHealth();
+      _apiService!.addListener(_onServiceChanged);
+    }
+    return _apiService!;
+  }
 
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService();
-    _apiService.checkHealth();
-    _fetchCachedLatest();
-    _apiService.addListener(_onServiceChanged);
+    _service;
   }
 
   @override
   void dispose() {
-    _apiService.removeListener(_onServiceChanged);
-    _apiService.dispose();
+    final service = _apiService;
+    if (service != null) {
+      service.removeListener(_onServiceChanged);
+      if (_ownsApiService) {
+        service.dispose();
+      }
+    }
     super.dispose();
   }
 
   void _onServiceChanged() {
-    if (_apiService.latestReading != null) {
-      if (mounted) {
-        setState(() {
-          _cachedLatestData = _apiService.latestReading;
-        });
-      }
-    } else {
-      _fetchCachedLatest();
+    final latest = _service.latestReading;
+    if (latest != _cachedLatestData && mounted) {
+      setState(() {
+        _cachedLatestData = latest;
+      });
     }
-  }
-
-  Future<void> _fetchCachedLatest() async {
-    try {
-      final data = _apiService.latestReading ?? await _apiService.fetchLatestReading();
-      if (mounted) {
-        setState(() {
-          _cachedLatestData = data;
-        });
-      }
-    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
+    final service = _service;
     final screens = [
-      DashboardScreen(apiService: _apiService),
-      HistoryScreen(apiService: _apiService),
-      CareScreen(
-        apiService: _apiService,
-        latestData: _cachedLatestData,
+      DashboardScreen(
+        apiService: service,
+        onOpenLogin: widget.onOpenLogin,
+        onLogout: widget.onLogout,
+      ),
+      HistoryScreen(apiService: service),
+      CareScreen(apiService: service, latestData: _cachedLatestData),
+      AccountScreen(
+        apiService: service,
+        onOpenLogin: widget.onOpenLogin,
+        onLogout: widget.onLogout,
       ),
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border, width: 1.0),
-          ),
+          border: Border(top: BorderSide(color: AppColors.border, width: 1.0)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
@@ -123,6 +232,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               icon: Icon(Icons.eco_outlined),
               activeIcon: Icon(Icons.eco),
               label: 'Chăm sóc',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Tài khoản',
             ),
           ],
         ),

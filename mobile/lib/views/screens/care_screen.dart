@@ -22,10 +22,12 @@ class _CareScreenState extends State<CareScreen> {
   List<CareRule> _rules = [];
   bool _isLoadingRules = false;
   String? _rulesError;
+  String? _lastRulesSourceKey;
 
   @override
   void initState() {
     super.initState();
+    _lastRulesSourceKey = widget.apiService.rulesSourceKey;
     _loadRules();
     widget.apiService.addListener(_onServiceChanged);
   }
@@ -37,7 +39,15 @@ class _CareScreenState extends State<CareScreen> {
   }
 
   void _onServiceChanged() {
-    _loadRules();
+    if (!mounted) return;
+    final nextKey = widget.apiService.rulesSourceKey;
+    if (_lastRulesSourceKey != null && nextKey != _lastRulesSourceKey) {
+      _lastRulesSourceKey = nextKey;
+      _loadRules();
+    } else {
+      _lastRulesSourceKey = nextKey;
+      setState(() {});
+    }
   }
 
   Future<void> _loadRules() async {
@@ -65,9 +75,21 @@ class _CareScreenState extends State<CareScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final reading = widget.latestData?.reading;
-    final isStale = widget.latestData?.isStale;
-    final advice = widget.latestData?.adviceMessage;
+    final effectiveLatest = widget.apiService.latestReading ?? widget.latestData;
+    final reading = effectiveLatest?.reading;
+    final isStale = effectiveLatest?.isStale;
+    final advice = effectiveLatest?.adviceMessage;
+    final adviceStatus = effectiveLatest?.adviceStatus;
+    final suggestedAction = effectiveLatest?.suggestedAction;
+    final isAdviceWarning = adviceStatus == 'danger' ||
+        adviceStatus == 'warning' ||
+        adviceStatus == 'insufficient_data';
+    final displayAdvice = (suggestedAction != null &&
+            suggestedAction.isNotEmpty &&
+            advice != null &&
+            !advice.contains(suggestedAction))
+        ? '$advice\nHành động gợi ý: $suggestedAction'
+        : advice;
 
     return Scaffold(
       appBar: AppBar(
@@ -86,7 +108,7 @@ class _CareScreenState extends State<CareScreen> {
           padding: const EdgeInsets.all(AppSpacing.space4),
           children: [
             // 1. Banner trạng thái nhận định hiện tại
-            if (widget.latestData == null || reading == null) ...[
+            if (effectiveLatest == null || reading == null) ...[
               _buildInfoCard(
                 title: 'Chưa có dữ liệu cảm biến',
                 message: 'Không đủ dữ liệu để đưa ra nhận định hoặc khuyến nghị tưới/chăm sóc.',
@@ -98,11 +120,13 @@ class _CareScreenState extends State<CareScreen> {
                 message: 'Thiết bị mất liên lạc quá 5 phút. Quy tắc chăm sóc không áp dụng cho số đo đã cũ.',
                 isWarning: true,
               ),
-            ] else if (advice != null && advice.isNotEmpty) ...[
+            ] else if (displayAdvice != null && displayAdvice.isNotEmpty) ...[
               _buildInfoCard(
-                title: 'Khuyến nghị hiện tại từ Backend',
-                message: advice,
-                isWarning: false,
+                title: isAdviceWarning
+                    ? 'Cảnh báo chăm sóc từ Backend'
+                    : 'Khuyến nghị hiện tại từ Backend',
+                message: displayAdvice,
+                isWarning: isAdviceWarning,
               ),
             ] else ...[
               _buildInfoCard(
@@ -283,6 +307,44 @@ class _CareScreenState extends State<CareScreen> {
                   ),
                 ),
               ),
+              if (widget.apiService.currentUser?.isAdmin == true && rule.id != null) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.coralStrong),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Xóa quy tắc (Admin)',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Xác nhận xóa'),
+                        content: Text('Xóa quy tắc "${rule.name}" khỏi hệ thống?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.coralStrong),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Xóa'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      try {
+                        await widget.apiService.deleteRule(rule.id!);
+                        _loadRules();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Lỗi: $e')),
+                          );
+                        }
+                      }
+                    }
+                  },
+                ),
+              ],
             ],
           ),
           if (rule.description != null && rule.description!.isNotEmpty) ...[
