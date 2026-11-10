@@ -51,8 +51,8 @@ export const APP_CONFIG = {
   // Base URL của Backend chính thức
   apiBaseUrl: API_BASE_URL,
 
-  // Chu kỳ tự động làm mới số đo (10 giây)
-  autoRefreshIntervalMs: 10000,
+  // Chu kỳ tự động làm mới số đo (3 giây)
+  autoRefreshIntervalMs: 3000,
 
   // Múi giờ hiển thị (GMT+7 Việt Nam)
   timeZone: 'Asia/Ho_Chi_Minh'

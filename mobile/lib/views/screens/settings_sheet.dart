@@ -24,8 +24,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
   bool? _healthStatus;
   String? _healthMessage;
 
-  // ThingSpeak sync state
-  bool _isSyncingThingSpeak = false;
+  // Bridge sync state
+  bool _isSyncingBridge = false;
 
   // Auth form state
   final TextEditingController _usernameController = TextEditingController(text: 'admin');
@@ -82,14 +82,14 @@ class _SettingsSheetState extends State<SettingsSheet> {
     });
   }
 
-  Future<void> _syncThingSpeak() async {
+  Future<void> _syncBridge() async {
     setState(() {
-      _isSyncingThingSpeak = true;
+      _isSyncingBridge = true;
     });
 
     try {
-      final res = await widget.apiService.triggerThingSpeakSync();
-      final added = res['created'] ?? res['added'] ?? 0;
+      final res = await widget.apiService.triggerBridgeSync();
+      final added = res['created'] ?? res['new_readings_count'] ?? res['added'] ?? 0;
       final total = res['fetched'] ?? res['total_feeds'] ?? 0;
       final duplicates = res['duplicates'] ?? 0;
       if (mounted) {
@@ -97,7 +97,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
           SnackBar(
             backgroundColor: AppColors.navy,
             content: Text(
-              'Đồng bộ ThingSpeak thành công! ($added bản ghi mới, $duplicates trùng / $total feeds)',
+              'Đồng bộ Sensor Data Bridge thành công! ($added bản ghi mới, $duplicates trùng / $total feeds)',
             ),
           ),
         );
@@ -107,12 +107,12 @@ class _SettingsSheetState extends State<SettingsSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.coralStrong,
-            content: Text('Lỗi đồng bộ: $e'),
+            content: Text('Lỗi đồng bộ Bridge: $e'),
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isSyncingThingSpeak = false);
+      if (mounted) setState(() => _isSyncingBridge = false);
     }
   }
 
@@ -186,40 +186,76 @@ class _SettingsSheetState extends State<SettingsSheet> {
               style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
             ),
             const SizedBox(height: AppSpacing.space1),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Center(child: Text('Backend thật (API Live)')),
-                    selected: _mode == DataSourceMode.live,
-                    selectedColor: AppColors.tealSoft,
-                    labelStyle: TextStyle(
-                      color: _mode == DataSourceMode.live ? AppColors.navy : AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _mode = DataSourceMode.live);
-                    },
+                ChoiceChip(
+                  label: const Text('Backend TDat (Khuyến nghị 100%)'),
+                  selected: _mode == DataSourceMode.live,
+                  selectedColor: AppColors.tealSoft,
+                  labelStyle: TextStyle(
+                    color: _mode == DataSourceMode.live ? AppColors.navy : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
                   ),
+                  onSelected: (selected) {
+                    if (selected) setState(() => _mode = DataSourceMode.live);
+                  },
                 ),
-                const SizedBox(width: AppSpacing.space2),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Center(child: Text('Dữ liệu mẫu (Fixture G0)')),
-                    selected: _mode == DataSourceMode.fixture,
-                    selectedColor: AppColors.tealSoft,
-                    labelStyle: TextStyle(
-                      color: _mode == DataSourceMode.fixture ? AppColors.navy : AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    onSelected: (selected) {
-                      if (selected) setState(() => _mode = DataSourceMode.fixture);
-                    },
+                ChoiceChip(
+                  label: const Text('Sensor Data Bridge (Dự phòng Mục 7)'),
+                  selected: _mode == DataSourceMode.bridge,
+                  selectedColor: AppColors.tealSoft,
+                  labelStyle: TextStyle(
+                    color: _mode == DataSourceMode.bridge ? AppColors.navy : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
                   ),
+                  onSelected: (selected) {
+                    if (selected) setState(() => _mode = DataSourceMode.bridge);
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('Dữ liệu mẫu (Fixture G0)'),
+                  selected: _mode == DataSourceMode.fixture,
+                  selectedColor: AppColors.tealSoft,
+                  labelStyle: TextStyle(
+                    color: _mode == DataSourceMode.fixture ? AppColors.navy : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  onSelected: (selected) {
+                    if (selected) setState(() => _mode = DataSourceMode.fixture);
+                  },
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.space4),
+
+            // Phương án dự phòng trực tiếp Sensor Data Bridge (Mục 7)
+            if (_mode == DataSourceMode.bridge) ...[
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.space3),
+                decoration: BoxDecoration(
+                  color: AppColors.cream,
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dự phòng gọi trực tiếp Sensor Data Bridge (Kênh 1):',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.navy),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '• Endpoint: /api/v1/channels/1/feeds\n• Tự động quy đổi field1..field8 sang các số đo chuẩn\n• Sử dụng khi Backend TDat đang deploy lại hoặc bảo trì.',
+                      style: TextStyle(fontSize: 11, height: 16 / 11, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.space3),
+            ],
 
             // 2. Cấu hình Backend URL khi ở chế độ Live
             if (_mode == DataSourceMode.live) ...[
@@ -305,11 +341,11 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Kênh ThingSpeak (Channel 3543608)',
+                            'Sensor Data Bridge (Kênh 1)',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.navy),
                           ),
                           Text(
-                            'ESP32 gửi lên ThingSpeak, Backend tự động đồng bộ.',
+                            'ESP32 gửi lên Bridge, Backend tự động đồng bộ.',
                             style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                           ),
                         ],
@@ -321,8 +357,8 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         foregroundColor: AppColors.navy,
                         minimumSize: const Size(90, 36),
                       ),
-                      onPressed: _isSyncingThingSpeak ? null : _syncThingSpeak,
-                      child: _isSyncingThingSpeak
+                      onPressed: _isSyncingBridge ? null : _syncBridge,
+                      child: _isSyncingBridge
                           ? const SizedBox(
                               width: 14,
                               height: 14,
@@ -382,17 +418,27 @@ class _SettingsSheetState extends State<SettingsSheet> {
             const SizedBox(height: AppSpacing.space1),
             Wrap(
               spacing: 8,
+              runSpacing: 6,
               children: [
                 ActionChip(
-                  label: const Text('esp32-nursery-01 (Bình thường)'),
+                  avatar: const Icon(Icons.bolt, size: 16, color: Color(0xFF155724)),
+                  label: const Text('1 (Trạm Realtime Live 🟢)'),
+                  backgroundColor: _deviceController.text == '1' ? AppColors.tealSoft : null,
+                  onPressed: () => setState(() => _deviceController.text = '1'),
+                ),
+                ActionChip(
+                  label: const Text('esp32-nursery-01 (Trạm chính)'),
+                  backgroundColor: _deviceController.text == 'esp32-nursery-01' ? AppColors.tealSoft : null,
                   onPressed: () => setState(() => _deviceController.text = 'esp32-nursery-01'),
                 ),
                 ActionChip(
                   label: const Text('esp32-stale-01 (Dữ liệu cũ)'),
+                  backgroundColor: _deviceController.text == 'esp32-stale-01' ? AppColors.tealSoft : null,
                   onPressed: () => setState(() => _deviceController.text = 'esp32-stale-01'),
                 ),
                 ActionChip(
                   label: const Text('esp32-empty-01 (Chưa có số đo)'),
+                  backgroundColor: _deviceController.text == 'esp32-empty-01' ? AppColors.tealSoft : null,
                   onPressed: () => setState(() => _deviceController.text = 'esp32-empty-01'),
                 ),
               ],
