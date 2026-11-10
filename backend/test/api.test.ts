@@ -149,12 +149,17 @@ async function runTests() {
       console.log('✓ POST invalid reading (400 Bad Request) passed');
     }
 
-    // 10. Test GET /api/v1/sync/thingspeak/status
+    // 10. Test GET /api/v1/sync/bridge/status & /api/v1/sync/thingspeak/status
+    {
+      const res = await request('/api/v1/sync/bridge/status');
+      console.assert(res.status === 200, `Bridge status expected 200, got ${res.status}`);
+      console.assert(res.body.data.channelId === 1 || res.body.data.channelId === '1', 'Channel ID should be 1');
+      console.log('✓ GET Sensor Data Bridge sync status passed');
+    }
     {
       const res = await request('/api/v1/sync/thingspeak/status');
       console.assert(res.status === 200, `ThingSpeak status expected 200, got ${res.status}`);
-      console.assert(res.body.data.channelId === '3543608', 'Channel ID should be 3543608');
-      console.log('✓ GET ThingSpeak sync status passed');
+      console.log('✓ GET ThingSpeak legacy status (aliased) passed');
     }
 
     // 11. Test Rule Engine Evaluation (when toggled on/off)

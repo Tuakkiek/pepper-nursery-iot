@@ -39,8 +39,23 @@ DB_SSL=true
 
 STALE_THRESHOLD_MINUTES=5
 
-# ThingSpeak Integration (Tùy chọn ghi nhận qua ThingSpeak)
-THINGSPEAK_ENABLED=true
+# Telemetry Provider ('sensor_bridge' or 'thingspeak')
+TELEMETRY_PROVIDER=sensor_bridge
+
+# =========================================================================
+# Sensor Data Bridge (Cổng trung gian Cloud Render)
+# Khi API read key thay đổi, bạn chỉ cần cập nhật trường API_READ này:
+# =========================================================================
+API_READ=sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw
+
+SENSOR_BRIDGE_ENABLED=true
+SENSOR_BRIDGE_URL=https://sensor-data-bridge-frontened.onrender.com
+SENSOR_BRIDGE_CHANNEL_ID=1
+SENSOR_BRIDGE_DEVICE_ID=esp32-nursery-01
+SENSOR_BRIDGE_POLL_INTERVAL_MS=20000
+
+# ThingSpeak Integration (Tùy chọn dự phòng)
+THINGSPEAK_ENABLED=false
 THINGSPEAK_CHANNEL_ID=3543608
 THINGSPEAK_READ_API_KEY=EB9BC5UY233Z23O4
 THINGSPEAK_DEVICE_ID=esp32-nursery-01
@@ -161,24 +176,37 @@ Các bạn có thể phát triển giao diện độc lập mà không cần ch�
 
 ---
 
-### 4.3. Tích hợp ThingSpeak làm trạm trung gian (Ghi/Nhận)
-Hệ thống hỗ trợ cơ chế ESP32 gửi lên ThingSpeak và Backend tự động đồng bộ về MySQL Aiven:
+### 4.3. Tích hợp Cổng Chuyển tiếp Dữ liệu Cảm biến (Sensor Data Bridge)
+Hệ thống kết nối và đồng bộ tự động dữ liệu từ trạm trung gian **Sensor Data Bridge** về CSDL MySQL Aiven:
 
-* **Channel ID:** `3543608`
-* **API Read:** `EB9BC5UY233Z23O4`
-* **Ánh xạ 8 Fields:**
-  * Field 1: `air_temperature_c` (Nhiệt độ không khí °C)
-  * Field 2: `air_humidity_pct` (Độ ẩm không khí %)
-  * Field 3: `soil_temperature_c` (Nhiệt độ đầu dò °C)
-  * Field 4: `soil_moisture_pct` (Độ ẩm đất %)
-  * Field 5: `water_ph` (Độ pH)
-  * Field 6: `water_tds_ppm` (Chỉ số TDS ppm)
-  * Field 7: `soil_moisture_raw` (Giá trị ADC cảm biến đất)
-  * Field 8: `water_ph_adc_raw` (Giá trị ADC cảm biến pH)
-* **Cơ chế hoạt động:**
-  * Backend chạy một tiến trình ngầm (polling worker) mỗi 20 giây gọi API Read của ThingSpeak để lấy các feed mới nhất.
-  * Mỗi feed được chuyển đổi thành bản ghi chuẩn của hệ thống (`sample_id: ts-entry-{id}`) và tự động lưu vào MySQL trên Aiven.
-  * **Kích hoạt đồng bộ thủ công:** Gửi `POST /api/v1/sync/thingspeak` để kích hoạt đồng bộ ngay lập tức mà không cần chờ chu kỳ 20s.
+* **Trang quản trị / Giao diện người dùng:** `https://sensor-data-bridge-frontened.onrender.com`
+* **API Documentation (Swagger / OpenAPI):** `https://sensor-data-bridge-backend.onrender.com/docs`
+* **API Host:** `https://sensor-data-bridge-backend.onrender.com`
+* **Channel ID:** `1`
+* **API Read Key:** `sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw`
+* **Header xác thực khi gọi API:** `X-API-Key: sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw`
+
+#### Ánh xạ 8 Fields đo đạc:
+* `field1`: `air_temperature_c` (Nhiệt độ không khí °C — DHT22)
+* `field2`: `air_humidity_pct` (Độ ẩm không khí % — DHT22)
+* `field3`: `soil_temperature_c` (Nhiệt độ đầu dò đất °C — DS18B20)
+* `field4`: `soil_moisture_pct` (Độ ẩm đất quy đổi % — HD-38)
+* `field5`: `water_ph` (Độ pH nước tưới — PH-4502C)
+* `field6`: `water_tds_ppm` (Chỉ số TDS ppm — TDS Meter)
+* `field7`: `soil_moisture_raw` (Giá trị ADC thô cảm biến đất — HD-38)
+* `field8`: `water_ph_adc_raw` (Giá trị ADC thô cảm biến pH — PH-4502C)
+
+#### Cơ chế hoạt động:
+* Backend chạy một tiến trình ngầm (`SensorBridgeService`) định kỳ mỗi 20 giây gọi API đọc feed:
+  ```http
+  GET /api/v1/channels/1/feeds?limit=20
+  Host: sensor-data-bridge-backend.onrender.com
+  X-API-Key: sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw
+  ```
+* Mỗi feed được chuyển đổi thành bản ghi chuẩn (`sample_id: sdb-entry-{id}`), tự động chuẩn hóa UTC ISO 8601 và lưu vào MySQL trên Aiven (tự động deduplication chống trùng lặp).
+* **Endpoints Quản trị Đồng bộ:**
+  * Kiểm tra trạng thái Worker: `GET /api/v1/sync/bridge/status` (hỗ trợ alias `GET /api/v1/sync/thingspeak/status`).
+  * Kích hoạt đồng bộ thủ công tức thời: `POST /api/v1/sync/bridge` (hỗ trợ alias `POST /api/v1/sync/thingspeak`).
 
 ---
 

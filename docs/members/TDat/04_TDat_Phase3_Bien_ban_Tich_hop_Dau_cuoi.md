@@ -10,7 +10,7 @@
 * **Hạ tầng triển khai:**
   - **Backend Cloud:** Node.js 20 / TypeScript / Express trên Render (`https://pepper-nursery-iot.onrender.com`)
   - **Cơ sở dữ liệu Cloud:** MySQL 8.4 trên Aiven Cloud (`mysql-13f5204a-dat123456789fa-807a.a.aivencloud.com:19808`, database: `defaultdb`)
-  - **IoT Data Gateway:** ThingSpeak Cloud Channel ID `3543608` (Read Key: `EB9BC5UY233Z23O4`)
+  - **IoT Data Gateway:** Sensor Data Bridge (`https://sensor-data-bridge-frontened.onrender.com`, API: `https://sensor-data-bridge-backend.onrender.com`, Channel 1, Read Key: `sdb_read_eqQ-gZ5w8NeWaDoWQbXitJa-FAemYtcKwC34BHMwKnw`)
   - **Web Frontend:** React 19 + Vite trên Render (`https://pepper-nursery-iot-em0t.onrender.com`)
 
 ---
@@ -18,7 +18,7 @@
 ## 1. Mục tiêu Kiểm thử Tích hợp Đầu cuối (End-to-End Trace)
 
 Xác minh tính thông suốt của toàn bộ chuỗi truyền dữ liệu từ vườn ươm đến người dùng cuối:
-$$\text{Cảm biến vật lý} \xrightarrow{\text{GPIO}} \text{ESP32 (QTien)} \xrightarrow{\text{Wi-Fi}} \text{ThingSpeak} \xrightarrow{\text{Polling Worker (20s)}} \text{Backend TDat} \xrightarrow{\text{MySQL Aiven}} \text{API REST v1} \xrightarrow{\text{CORS / JSON}} \text{Web / Mobile}$$
+$$\text{Cảm biến vật lý} \xrightarrow{\text{GPIO}} \text{ESP32 (QTien)} \xrightarrow{\text{Wi-Fi}} \text{Sensor Data Bridge} \xrightarrow{\text{Polling Worker (20s)}} \text{Backend TDat} \xrightarrow{\text{MySQL Aiven}} \text{API REST v1} \xrightarrow{\text{CORS / JSON}} \text{Web / Mobile}$$
 
 **Các tiêu chí trọng yếu đã được xác thực:**
 1. **Toàn vẹn số đo:** Giá trị 5 cảm biến không bị làm tròn sai lệch, giữ đúng đơn vị kỹ thuật (°C, %, ppm, pH, ADC thô).
