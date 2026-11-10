@@ -1,18 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 
-export default function RuleModal({ rule, onClose, onSave }) {
-  const isEdit = !!rule;
+export default function RuleModal({ isOpen, rule, initialRule, onClose, onSave }) {
+  const currentRule = rule || initialRule;
+  const isEdit = !!currentRule;
 
-  const [ruleCode, setRuleCode] = useState(rule?.rule_code || '');
-  const [name, setName] = useState(rule?.name || '');
-  const [parameter, setParameter] = useState(rule?.parameter || 'air_temperature_c');
-  const [operator, setOperator] = useState(rule?.operator || '>');
-  const [thresholdMin, setThresholdMin] = useState(rule?.threshold_min !== undefined ? rule.threshold_min : 35);
-  const [thresholdMax, setThresholdMax] = useState(rule?.threshold_max !== undefined ? rule.threshold_max : '');
-  const [severity, setSeverity] = useState(rule?.severity || 'warning');
-  const [actionAdvice, setActionAdvice] = useState(rule?.action_advice || '');
-  const [isActive, setIsActive] = useState(rule?.is_active !== undefined ? rule.is_active : true);
+  const [ruleCode, setRuleCode] = useState('');
+  const [name, setName] = useState('');
+  const [parameter, setParameter] = useState('air_temperature_c');
+  const [operator, setOperator] = useState('>');
+  const [thresholdMin, setThresholdMin] = useState(35);
+  const [thresholdMax, setThresholdMax] = useState('');
+  const [severity, setSeverity] = useState('warning');
+  const [actionAdvice, setActionAdvice] = useState('');
+  const [isActive, setIsActive] = useState(true);
+
+  // Sync state whenever modal opens or currentRule changes
+  useEffect(() => {
+    if (isOpen) {
+      if (currentRule) {
+        setRuleCode(currentRule.rule_code || '');
+        setName(currentRule.name || '');
+        setParameter(currentRule.parameter || 'air_temperature_c');
+        setOperator(currentRule.operator || '>');
+        setThresholdMin(currentRule.threshold_min !== undefined && currentRule.threshold_min !== null ? currentRule.threshold_min : 35);
+        setThresholdMax(currentRule.threshold_max !== undefined && currentRule.threshold_max !== null ? currentRule.threshold_max : '');
+        setSeverity(currentRule.severity || 'warning');
+        setActionAdvice(currentRule.action_advice || '');
+        setIsActive(currentRule.is_active !== undefined ? currentRule.is_active : true);
+      } else {
+        setRuleCode('');
+        setName('');
+        setParameter('air_temperature_c');
+        setOperator('>');
+        setThresholdMin(35);
+        setThresholdMax('');
+        setSeverity('warning');
+        setActionAdvice('');
+        setIsActive(true);
+      }
+    }
+  }, [isOpen, currentRule]);
+
+  // Support closing with Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // If modal is not open, do not render anything
+  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -34,9 +77,15 @@ export default function RuleModal({ rule, onClose, onSave }) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">
-            {isEdit ? `Chỉnh sửa Quy tắc #${rule.id}` : 'Thêm Quy tắc Chăm sóc Mới'}
+            {isEdit ? `Chỉnh sửa Quy tắc #${currentRule.id}` : 'Thêm Quy tắc Chăm sóc Mới'}
           </h3>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button 
+            type="button" 
+            className="modal-close-btn" 
+            onClick={onClose}
+            title="Đóng (Esc)"
+            aria-label="Đóng"
+          >
             <X size={20} />
           </button>
         </div>
@@ -170,7 +219,11 @@ export default function RuleModal({ rule, onClose, onSave }) {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={onClose}
+            >
               Hủy
             </button>
             <button type="submit" className="btn btn-primary">
@@ -183,4 +236,3 @@ export default function RuleModal({ rule, onClose, onSave }) {
     </div>
   );
 }
-

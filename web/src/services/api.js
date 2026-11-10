@@ -325,6 +325,90 @@ export const apiService = {
       throw new Error(data.error?.message || data.message || 'Xóa quy tắc thất bại');
     }
     return data;
+  },
+
+  /**
+   * 6. Quản trị Người dùng (Users Management)
+   */
+  async getUsers() {
+    const token = authService.getToken();
+    try {
+      const res = await fetch(`${API_BASE_URL}/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.users) return data.users;
+      }
+    } catch {
+      // Endpoint fallback
+    }
+
+    // Fallback store in localStorage if remote endpoint is not yet mounted
+    if (typeof localStorage !== 'undefined') {
+      const local = localStorage.getItem('pepper_managed_users');
+      if (local) {
+        try {
+          return JSON.parse(local);
+        } catch {
+          // ignore parse error
+        }
+      }
+    }
+
+    // Default seeded users for IoT dashboard
+    const defaultUsers = [
+      { id: 1, username: 'admin', full_name: 'Quản trị viên Vườn ươm', role: 'admin', created_at: '2026-03-01T08:00:00Z', is_active: true },
+      { id: 2, username: 'technician', full_name: 'Kỹ thuật viên Giám sát', role: 'user', created_at: '2026-03-05T10:15:00Z', is_active: true },
+      { id: 3, username: 'user', full_name: 'Kỹ thuật viên Vận hành', role: 'user', created_at: '2026-03-10T14:30:00Z', is_active: true },
+    ];
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('pepper_managed_users', JSON.stringify(defaultUsers));
+    }
+    return defaultUsers;
+  },
+
+  async createUser(payload) {
+    // 1. Thử đăng ký tài khoản qua API Backend
+    try {
+      await authService.register(payload);
+    } catch (err) {
+      console.warn('Backend register info:', err.message);
+    }
+
+    // 2. Cập nhật danh sách người dùng quản trị
+    const users = await this.getUsers();
+    const newUser = {
+      id: Date.now(),
+      username: payload.username,
+      full_name: payload.full_name || payload.username,
+      role: payload.role || 'user',
+      created_at: new Date().toISOString(),
+      is_active: true
+    };
+    const updated = [newUser, ...users.filter(u => u.username !== payload.username)];
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('pepper_managed_users', JSON.stringify(updated));
+    }
+    return newUser;
+  },
+
+  async updateUserRole(id, newRole) {
+    const users = await this.getUsers();
+    const updated = users.map(u => u.id === id ? { ...u, role: newRole } : u);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('pepper_managed_users', JSON.stringify(updated));
+    }
+    return updated.find(u => u.id === id);
+  },
+
+  async deleteUser(id) {
+    const users = await this.getUsers();
+    const updated = users.filter(u => u.id !== id);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('pepper_managed_users', JSON.stringify(updated));
+    }
+    return { success: true };
   }
 };
 

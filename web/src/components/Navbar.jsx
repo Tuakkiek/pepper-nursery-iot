@@ -46,26 +46,30 @@ export default function Navbar({
 
         {/* Actions & Profile */}
         <div className="header-actions">
-          {/* Telemetry / Bridge Sync Trigger */}
-          <button 
-            className="btn btn-secondary btn-sm"
-            onClick={onSyncThingSpeak}
-            title="Kích hoạt Backend đồng bộ tức thời từ Sensor Data Bridge (POST /api/v1/sync/bridge)"
-          >
-            <Radio size={14} className="text-teal" />
-            <span>Đồng bộ Telemetry</span>
-          </button>
+          {activeTab === 'live' && (
+            <>
+              {/* Telemetry / Bridge Sync Trigger */}
+              <button 
+                className="btn btn-secondary btn-sm"
+                onClick={onSyncThingSpeak}
+                title="Kích hoạt Backend đồng bộ tức thời từ Sensor Data Bridge (POST /api/v1/sync/bridge)"
+              >
+                <Radio size={14} className="text-teal" />
+                <span>Đồng bộ Telemetry</span>
+              </button>
 
-          {/* Refresh Button */}
-          <button 
-            className="btn btn-primary btn-sm" 
-            onClick={onRefresh}
-            disabled={isLoading}
-            title="Làm mới dữ liệu từ API"
-          >
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-            <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
-          </button>
+              {/* Refresh Button */}
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={onRefresh}
+                disabled={isLoading}
+                title="Làm mới dữ liệu từ API"
+              >
+                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                <span>{isLoading ? 'Đang tải...' : 'Làm mới'}</span>
+              </button>
+            </>
+          )}
 
           {/* Auth Bar */}
           {user ? (
@@ -106,64 +110,66 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Control Bar: Trạm & Nguồn Dữ Liệu */}
-      <div className="controls-bar" style={{ padding: '8px 0', borderTop: '1px solid var(--border-subtle)' }}>
-        {/* Chọn thiết bị */}
-        <div className="control-item">
-          <label htmlFor="device-select">Trạm:</label>
-          <select 
-            id="device-select"
-            className="select-input"
-            value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
-          >
-            {APP_CONFIG.availableDevices.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Nguồn dữ liệu Switch */}
-        <div className="control-item">
-          <span>Nguồn:</span>
-          <div className="segmented-switch">
-            <button 
-              type="button"
-              className={`segmented-btn ${dataMode === 'REAL_API' ? 'active' : ''}`}
-              onClick={() => setDataMode('REAL_API')}
-            >
-              <Cloud size={13} />
-              <span>API Thật (Cloud Render)</span>
-            </button>
-            <button 
-              type="button"
-              className={`segmented-btn ${dataMode === 'FIXTURE' ? 'active' : ''}`}
-              onClick={() => setDataMode('FIXTURE')}
-            >
-              <Database size={13} />
-              <span>Dữ liệu mẫu (G0 Mock)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Kịch bản Fixture nếu đang ở chế độ mock */}
-        {dataMode === 'FIXTURE' && (
-          <div className="control-item" style={{ animation: 'fadeIn 0.2s' }}>
-            <label htmlFor="scenario-select" style={{ color: 'var(--brand-teal)' }}>Kịch bản:</label>
+      {/* Control Bar: Trạm & Nguồn Dữ Liệu (chỉ hiển thị ở tab Giám sát hoặc Sandbox) */}
+      {activeTab !== 'admin' && (
+        <div className="controls-bar" style={{ padding: '8px 0', borderTop: '1px solid var(--border-subtle)' }}>
+          {/* Chọn thiết bị */}
+          <div className="control-item">
+            <label htmlFor="device-select">Trạm:</label>
             <select 
-              id="scenario-select"
+              id="device-select"
               className="select-input"
-              style={{ borderColor: 'var(--brand-teal)', background: 'var(--teal-soft)' }}
-              value={currentScenario}
-              onChange={(e) => setCurrentScenario(e.target.value)}
+              value={deviceId}
+              onChange={(e) => setDeviceId(e.target.value)}
             >
-              {APP_CONFIG.mockScenarios.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {APP_CONFIG.availableDevices.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
           </div>
-        )}
-      </div>
+
+          {/* Nguồn dữ liệu Switch */}
+          <div className="control-item">
+            <span>Nguồn:</span>
+            <div className="segmented-switch">
+              <button 
+                type="button"
+                className={`segmented-btn ${dataMode === 'REAL_API' ? 'active' : ''}`}
+                onClick={() => setDataMode('REAL_API')}
+              >
+                <Cloud size={13} />
+                <span>API Thật (Cloud Render)</span>
+              </button>
+              <button 
+                type="button"
+                className={`segmented-btn ${dataMode === 'FIXTURE' ? 'active' : ''}`}
+                onClick={() => setDataMode('FIXTURE')}
+              >
+                <Database size={13} />
+                <span>Dữ liệu mẫu (G0 Mock)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Kịch bản Fixture nếu đang ở chế độ mock */}
+          {dataMode === 'FIXTURE' && (
+            <div className="control-item" style={{ animation: 'fadeIn 0.2s' }}>
+              <label htmlFor="scenario-select" style={{ color: 'var(--brand-teal)' }}>Kịch bản:</label>
+              <select 
+                id="scenario-select"
+                className="select-input"
+                style={{ borderColor: 'var(--brand-teal)', background: 'var(--teal-soft)' }}
+                value={currentScenario}
+                onChange={(e) => setCurrentScenario(e.target.value)}
+              >
+                {APP_CONFIG.mockScenarios.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Nav Tabs */}
       <nav className="nav-tabs-bar" aria-label="Điều hướng chính">
@@ -173,15 +179,20 @@ export default function Navbar({
             onClick={() => setActiveTab('live')}
           >
             <Activity size={16} />
-            <span>Giám sát vườn ươm</span>
+            <span>Giám sát vườn ươm (Số đo)</span>
           </button>
-          <button 
-            className={`nav-tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
-            onClick={() => setActiveTab('admin')}
-          >
-            <SlidersHorizontal size={16} />
-            <span>Quản trị quy tắc Admin</span>
-          </button>
+          
+          {user?.role === 'admin' && (
+            <button 
+              className={`nav-tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => setActiveTab('admin')}
+              style={{ color: 'var(--brand-coral)', fontWeight: 700 }}
+            >
+              <ShieldCheck size={16} />
+              <span>Trang Quản trị Admin</span>
+            </button>
+          )}
+
           <button 
             className={`nav-tab-btn ${activeTab === 'sandbox' ? 'active' : ''}`}
             onClick={() => setActiveTab('sandbox')}
