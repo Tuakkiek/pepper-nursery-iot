@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../models/auth_user.dart';
 import '../models/care_rule.dart';
+import '../models/device_info.dart';
 import '../models/sensor_reading.dart';
 
 enum DataSourceMode {
@@ -44,9 +45,10 @@ class ApiService extends ChangeNotifier {
   String? _token;
   AuthUser? _currentUser;
 
-  // Backend connection status
+  // Backend connection status & device registry
   bool _isBackendOnline = false;
   String? _lastHealthTimestamp;
+  List<DeviceInfo> _devices = [];
 
   // Auto-refresh state (cập nhật tự động mỗi 3s)
   Timer? _autoRefreshTimer;
@@ -74,6 +76,7 @@ class ApiService extends ChangeNotifier {
   bool get isAuthenticated => _token != null && _currentUser != null;
   bool get isBackendOnline => _isBackendOnline;
   String? get lastHealthTimestamp => _lastHealthTimestamp;
+  List<DeviceInfo> get devices => _devices;
 
   bool get autoRefresh => _autoRefresh;
   int get refreshIntervalSeconds => _refreshIntervalSeconds;
@@ -194,6 +197,7 @@ class ApiService extends ChangeNotifier {
         final data = jsonDecode(response.body);
         _isBackendOnline = data['status'] == 'ok';
         _lastHealthTimestamp = data['timestamp'];
+        unawaited(fetchDevices());
         notifyListeners();
         return true;
       } else {
@@ -206,6 +210,37 @@ class ApiService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Lấy danh sách thiết bị từ Backend (GET /api/v1/devices)
+  Future<List<DeviceInfo>> fetchDevices() async {
+    if (_mode == DataSourceMode.fixture) {
+      _devices = [
+        const DeviceInfo(deviceId: '1', name: 'Trạm 1 (Vườn ươm Realtime)', isOnline: true, isActive: true),
+        const DeviceInfo(deviceId: 'esp32-nursery-01', name: 'esp32-nursery-01', isOnline: true),
+        const DeviceInfo(deviceId: 'esp32-stale-01', name: 'esp32-stale-01 (Dữ liệu cũ)', isOnline: false),
+        const DeviceInfo(deviceId: 'esp32-empty-01', name: 'esp32-empty-01 (Chưa có số đo)', isOnline: false),
+      ];
+      notifyListeners();
+      return _devices;
+    }
+
+    try {
+      final uri = Uri.parse('$_baseUrl/api/v1/devices');
+      final response = await http
+          .get(uri, headers: _getHeaders())
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = (data['devices'] as List<dynamic>?) ?? [];
+        _devices = list.map((item) => DeviceInfo.fromJson(item as Map<String, dynamic>)).toList();
+        notifyListeners();
+        return _devices;
+      }
+    } catch (_) {
+      // Khi không tải được danh sách thì giữ nguyên danh sách hiện thời
+    }
+    return _devices;
   }
 
   /// 2. Lấy số đo mới nhất (GET /api/v1/devices/{device_id}/readings/latest)
@@ -488,6 +523,11 @@ class ApiService extends ChangeNotifier {
       final data = jsonDecode(response.body);
       _token = data['token'] as String?;
       _currentUser = AuthUser.fromJson(data['user'] as Map<String, dynamic>);
+      if (_currentUser?.selectedDeviceId != null &&
+          _currentUser!.selectedDeviceId!.isNotEmpty) {
+        _deviceId = _currentUser!.selectedDeviceId!;
+      }
+      unawaited(fetchDevices());
       notifyListeners();
       return _currentUser!;
     } else {

@@ -149,6 +149,178 @@ class CareAdvice {
   bool get isWarning => status == 'warning';
   bool get isOptimal => status == 'optimal';
   bool get isInsufficientData => status == 'insufficient_data';
+
+  static CareAdvice evaluateLocal(ReadingData? reading, {bool? isStale}) {
+    if (reading == null) {
+      return const CareAdvice(
+        status: 'insufficient_data',
+        message: 'Chưa có dữ liệu cảm biến để phân tích.',
+      );
+    }
+    if (isStale == true) {
+      return const CareAdvice(
+        status: 'warning',
+        code: 'DATA_STALE',
+        message: 'Dữ liệu từ thiết bị đã cũ quá 5 phút hoặc trạm mất liên lạc. Hệ thống tạm dừng đưa ra lời khuyên chăm sóc.',
+        suggestedAction: 'Kiểm tra nguồn điện và kết nối Wi-Fi của trạm ESP32.',
+      );
+    }
+
+    // 1. Kiểm tra mức Nguy hiểm (Danger - ưu tiên cao nhất)
+    if (reading.waterPh != null && reading.waterPh! < 5.3) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_PH_EXTREME_ACID',
+        message: 'Nước tưới cực chua (Axit nặng: pH ${reading.waterPh!.toStringAsFixed(1)}): Nguy cơ cháy rễ non và ngộ độc kim loại.',
+        suggestedAction: 'Tuyệt đối không tưới! Dùng nước vôi trong nâng pH lên 6.0 - 6.5.',
+      );
+    }
+    if (reading.waterPh != null && reading.waterPh! > 7.5) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_PH_EXTREME_ALKALINE',
+        message: 'Nước tưới kiềm hóa nặng (pH ${reading.waterPh!.toStringAsFixed(1)}): Gây kết tủa phân bón, nghẹt hấp thu vi lượng.',
+        suggestedAction: 'Tuyệt đối không tưới! Dùng axit citric hữu cơ hạ pH về 6.0 - 6.5.',
+      );
+    }
+    if (reading.soilMoisturePct != null && reading.soilMoisturePct! < 55.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_SOIL_EXTREME_DRY',
+        message: 'Giá thể cực khô hạn (${reading.soilMoisturePct!.toStringAsFixed(0)}%): Rễ non bị kiệt nước teo héo khẩn cấp.',
+        suggestedAction: 'Tưới bù ẩm khẩn cấp bằng phun sương mịn đều mặt khay.',
+      );
+    }
+    if (reading.soilMoisturePct != null && reading.soilMoisturePct! > 85.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_SOIL_EXTREME_WET',
+        message: 'Giá thể ngập úng ngạt khí (${reading.soilMoisturePct!.toStringAsFixed(0)}%): Nguy cơ thối nhũn rễ con.',
+        suggestedAction: 'Ngừng tưới ngay, kê khay xốp cao 20cm, thông gió đáy.',
+      );
+    }
+    if (reading.airTemperatureC != null && reading.airTemperatureC! > 32.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_TEMP_EXTREME_HIGH',
+        message: 'Nhiệt độ không khí cực cao (${reading.airTemperatureC!.toStringAsFixed(1)}°C): Nguy cơ cháy lá non và sốc nhiệt.',
+        suggestedAction: 'Kéo lưới che 70% nắng, bật phun sương mái làm mát.',
+      );
+    }
+    if (reading.airTemperatureC != null && reading.airTemperatureC! < 16.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_TEMP_EXTREME_LOW',
+        message: 'Nhiệt độ không khí cực thấp (${reading.airTemperatureC!.toStringAsFixed(1)}°C): Nguy cơ làm chết cóng cây con.',
+        suggestedAction: 'Che chắn gió lùa, phủ nylon giữ ấm, bật đèn sưởi.',
+      );
+    }
+    if (reading.airHumidityPct != null && reading.airHumidityPct! < 50.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_HUM_EXTREME_LOW',
+        message: 'Độ ẩm không khí cực thấp (${reading.airHumidityPct!.toStringAsFixed(0)}%): Không khí khô hạn gay gắt làm teo héo lá.',
+        suggestedAction: 'Bật phun sương làm ẩm không gian, tưới nền.',
+      );
+    }
+    if (reading.airHumidityPct != null && reading.airHumidityPct! > 85.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_HUM_EXTREME_HIGH',
+        message: 'Độ ẩm không khí cực cao (${reading.airHumidityPct!.toStringAsFixed(0)}%): Đọng nước dễ bùng phát nấm lở cổ rễ.',
+        suggestedAction: 'Mở tối đa cửa gió, quạt đối lưu, rắc vôi bột lối đi.',
+      );
+    }
+    if (reading.waterTdsPpm != null && reading.waterTdsPpm! > 850.0) {
+      return CareAdvice(
+        status: 'danger',
+        code: 'RULE_TDS_EXTREME_HIGH',
+        message: 'Dinh dưỡng nước tưới ngộ độc muối (${reading.waterTdsPpm!.toStringAsFixed(0)} ppm): Xót và cháy rễ khẩn cấp.',
+        suggestedAction: 'Nguy hiểm khẩn cấp! Ngừng tưới, xả nước sạch rửa trôi muối.',
+      );
+    }
+
+    // 2. Kiểm tra mức Cảnh báo (Warning)
+    if (reading.airTemperatureC != null && reading.airTemperatureC! > 28.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_TEMP_HIGH',
+        message: 'Nhiệt độ không khí cao (${reading.airTemperatureC!.toStringAsFixed(1)}°C): Làm tăng thoát hơi nước ở lá.',
+        suggestedAction: 'Mở thông gió, kéo lưới che 30% nắng.',
+      );
+    }
+    if (reading.airTemperatureC != null && reading.airTemperatureC! < 20.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_TEMP_LOW',
+        message: 'Nhiệt độ không khí thấp (${reading.airTemperatureC!.toStringAsFixed(1)}°C): Làm chậm sinh trưởng cây con.',
+        suggestedAction: 'Khép bớt cửa gió, tránh tưới nước lạnh sáng sớm.',
+      );
+    }
+    if (reading.airHumidityPct != null && reading.airHumidityPct! > 75.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_HUM_HIGH',
+        message: 'Độ ẩm không khí cao (${reading.airHumidityPct!.toStringAsFixed(0)}%): Tăng nguy cơ đọng nấm bệnh.',
+        suggestedAction: 'Tăng thông gió, tránh tưới chiều tối.',
+      );
+    }
+    if (reading.airHumidityPct != null && reading.airHumidityPct! < 60.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_HUM_LOW',
+        message: 'Độ ẩm không khí thấp (${reading.airHumidityPct!.toStringAsFixed(0)}%): Lá non dễ mất nước.',
+        suggestedAction: 'Phun sương nhẹ giữ ẩm không khí.',
+      );
+    }
+    if (reading.soilMoisturePct != null && reading.soilMoisturePct! < 65.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_SOIL_DRY',
+        message: 'Giá thể thiếu ẩm (${reading.soilMoisturePct!.toStringAsFixed(0)}%): Bắt đầu khô se mặt.',
+        suggestedAction: 'Chuẩn bị tưới bổ sung nước sạch trong 1-2h tới.',
+      );
+    }
+    if (reading.soilMoisturePct != null && reading.soilMoisturePct! > 80.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_SOIL_WET',
+        message: 'Giá thể thừa ẩm (${reading.soilMoisturePct!.toStringAsFixed(0)}%): Nguy cơ bí rễ.',
+        suggestedAction: 'Tạm dừng cữ tưới tiếp theo, chờ se mặt giá thể.',
+      );
+    }
+    if (reading.waterPh != null && reading.waterPh! < 5.8) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_PH_ACID',
+        message: 'Nước tưới chua nhẹ (pH ${reading.waterPh!.toStringAsFixed(1)}): Rễ khó hấp thu khoáng chất.',
+        suggestedAction: 'Châm thêm nước giếng sạch hoặc sục khí bể chứa.',
+      );
+    }
+    if (reading.waterPh != null && reading.waterPh! > 6.8) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_PH_ALKALINE',
+        message: 'Nước tưới hơi kiềm (pH ${reading.waterPh!.toStringAsFixed(1)}): Theo dõi hấp thu vi lượng.',
+        suggestedAction: 'Theo dõi gân lá non, chuẩn bị điều chỉnh nhẹ pH.',
+      );
+    }
+    if (reading.waterTdsPpm != null && reading.waterTdsPpm! > 450.0) {
+      return CareAdvice(
+        status: 'warning',
+        code: 'RULE_TDS_HIGH',
+        message: 'Dinh dưỡng nước tưới đậm đặc (${reading.waterTdsPpm!.toStringAsFixed(0)} ppm).',
+        suggestedAction: 'Pha loãng thêm 30-50% nước sạch trước khi tưới.',
+      );
+    }
+
+    // 3. Điều kiện tối ưu (Optimal)
+    return const CareAdvice(
+      status: 'optimal',
+      message: 'Môi trường vườn ươm ớt con đang ở điều kiện sinh trưởng lý tưởng.',
+      suggestedAction: 'Duy trì chế độ thông gió và lịch tưới ổn định hiện tại.',
+    );
+  }
 }
 
 class LatestReadingResponse {
@@ -169,21 +341,27 @@ class LatestReadingResponse {
   String? get adviceMessage => advice?.message;
 
   factory LatestReadingResponse.fromJson(Map<String, dynamic> json) {
+    final reading = json['reading'] != null
+        ? ReadingData.fromJson(json['reading'] as Map<String, dynamic>)
+        : null;
+    final isStale = json['is_stale'] as bool?;
+
     CareAdvice? adviceObj;
     final adviceVal = json['advice'];
     if (adviceVal != null) {
       adviceObj = CareAdvice.fromJson(adviceVal);
+    } else {
+      // Khi backend trả về advice: null, tự động đánh giá nông học cục bộ theo hợp đồng G0 v0.1
+      adviceObj = CareAdvice.evaluateLocal(reading, isStale: isStale);
     }
 
     return LatestReadingResponse(
       deviceId: json['device_id'] as String? ?? '',
-      reading: json['reading'] != null
-          ? ReadingData.fromJson(json['reading'] as Map<String, dynamic>)
-          : null,
+      reading: reading,
       receivedAt: json['received_at'] != null
           ? DateTime.tryParse(json['received_at'] as String)
           : null,
-      isStale: json['is_stale'] as bool?,
+      isStale: isStale,
       advice: adviceObj,
     );
   }

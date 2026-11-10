@@ -418,17 +418,27 @@ class _SettingsSheetState extends State<SettingsSheet> {
             const SizedBox(height: AppSpacing.space1),
             Wrap(
               spacing: 8,
+              runSpacing: 6,
               children: [
                 ActionChip(
-                  label: const Text('esp32-nursery-01 (Bình thường)'),
+                  avatar: const Icon(Icons.bolt, size: 16, color: Color(0xFF155724)),
+                  label: const Text('1 (Trạm Realtime Live 🟢)'),
+                  backgroundColor: _deviceController.text == '1' ? AppColors.tealSoft : null,
+                  onPressed: () => setState(() => _deviceController.text = '1'),
+                ),
+                ActionChip(
+                  label: const Text('esp32-nursery-01 (Trạm chính)'),
+                  backgroundColor: _deviceController.text == 'esp32-nursery-01' ? AppColors.tealSoft : null,
                   onPressed: () => setState(() => _deviceController.text = 'esp32-nursery-01'),
                 ),
                 ActionChip(
                   label: const Text('esp32-stale-01 (Dữ liệu cũ)'),
+                  backgroundColor: _deviceController.text == 'esp32-stale-01' ? AppColors.tealSoft : null,
                   onPressed: () => setState(() => _deviceController.text = 'esp32-stale-01'),
                 ),
                 ActionChip(
                   label: const Text('esp32-empty-01 (Chưa có số đo)'),
+                  backgroundColor: _deviceController.text == 'esp32-empty-01' ? AppColors.tealSoft : null,
                   onPressed: () => setState(() => _deviceController.text = 'esp32-empty-01'),
                 ),
               ],

@@ -307,5 +307,64 @@ void main() {
     final deleted = await apiService.deleteRule(1);
     expect(deleted, isTrue);
   });
+
+  test('Kiểm tra tự động đánh giá nông học cục bộ khi Backend trả về advice: null', () {
+    // Trường hợp nước tưới cực chua (pH = 4.2) như dữ liệu thực tế từ Bridge
+    final dangerousReadingJson = {
+      'device_id': '1',
+      'reading': {
+        'schema_version': '0.1',
+        'device_id': '1',
+        'sample_id': 'sdb-entry-999',
+        'recorded_at': '2026-11-10T17:00:00Z',
+        'water_ph': 4.2,
+        'soil_moisture_pct': 0.0,
+        'air_temperature_c': 30.5,
+        'air_humidity_pct': 78.0,
+      },
+      'received_at': '2026-11-10T17:00:02Z',
+      'is_stale': false,
+      'advice': null,
+    };
+
+    final res = LatestReadingResponse.fromJson(dangerousReadingJson);
+    expect(res.advice, isNotNull);
+    expect(res.advice!.isDanger, isTrue);
+    expect(res.advice!.code, equals('RULE_PH_EXTREME_ACID'));
+    expect(res.advice!.message, contains('Nước tưới cực chua'));
+    expect(res.advice!.suggestedAction, contains('nước vôi trong'));
+
+    // Trường hợp thông số lý tưởng
+    final optimalReadingJson = {
+      'device_id': 'esp32-nursery-01',
+      'reading': {
+        'schema_version': '0.1',
+        'device_id': 'esp32-nursery-01',
+        'sample_id': 'sample-opt',
+        'recorded_at': '2026-11-10T17:00:00Z',
+        'water_ph': 6.2,
+        'soil_moisture_pct': 70.0,
+        'air_temperature_c': 25.0,
+        'air_humidity_pct': 68.0,
+        'water_tds_ppm': 350.0,
+      },
+      'received_at': '2026-11-10T17:00:02Z',
+      'is_stale': false,
+      'advice': null,
+    };
+
+    final optimalRes = LatestReadingResponse.fromJson(optimalReadingJson);
+    expect(optimalRes.advice, isNotNull);
+    expect(optimalRes.advice!.isOptimal, isTrue);
+    expect(optimalRes.advice!.message, contains('điều kiện sinh trưởng lý tưởng'));
+  });
+
+  test('Kiểm tra danh sách thiết bị fetchDevices trong ApiService', () async {
+    apiService.mode = DataSourceMode.fixture;
+    final devs = await apiService.fetchDevices();
+    expect(devs, isNotEmpty);
+    expect(devs.any((d) => d.deviceId == '1'), isTrue);
+    expect(devs.any((d) => d.deviceId == 'esp32-nursery-01'), isTrue);
+  });
 }
 
