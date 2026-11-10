@@ -133,11 +133,12 @@ export async function seedDatabase(): Promise<void> {
 
   // 1. Devices
   await pool.query(`
-    INSERT INTO devices (device_id, name, description)
+    INSERT INTO devices (device_id, name, owner_id, description)
     VALUES 
-      ('esp32-nursery-01', 'Trạm vườn ươm ớt 01', 'Trạm thực tế gửi dữ liệu định kỳ'),
-      ('esp32-stale-01', 'Trạm kiểm thử dữ liệu cũ', 'Trạm mô phỏng mất kết nối (is_stale: true)'),
-      ('esp32-empty-01', 'Trạm mới chưa có dữ liệu', 'Trạm mới khởi tạo chưa có số đo (reading: null)')
+      ('1', 'esp32-nursery-01', NULL, 'Trạm vườn ươm ớt (Sensor Data Bridge Channel 1)'),
+      ('esp32-nursery-01', 'Trạm vườn ươm ớt 01', NULL, 'Trạm thực tế gửi dữ liệu định kỳ'),
+      ('esp32-stale-01', 'Trạm kiểm thử dữ liệu cũ', NULL, 'Trạm mô phỏng mất kết nối (is_stale: true)'),
+      ('esp32-empty-01', 'Trạm mới chưa có dữ liệu', NULL, 'Trạm mới khởi tạo chưa có số đo (reading: null)')
     ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description)
   `);
 
@@ -154,11 +155,11 @@ export async function seedDatabase(): Promise<void> {
   const userHash = bcrypt.hashSync('user123', 10);
 
   await pool.query(`
-    INSERT INTO users (username, password_hash, full_name, role)
+    INSERT INTO users (username, password_hash, full_name, role, selected_device_id)
     VALUES 
-      ('admin', ?, 'Quản trị viên Vườn ươm', 'admin'),
-      ('user', ?, 'Kỹ thuật viên Vườn ươm', 'user')
-    ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role)
+      ('admin', ?, 'Quản trị viên Vườn ươm', 'admin', '1'),
+      ('user', ?, 'Kỹ thuật viên Vườn ươm', 'user', '1')
+    ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role), selected_device_id = VALUES(selected_device_id)
   `, [adminHash, userHash]);
 
   // 4. Default Care Rules for Pepper Nursery (Ớt con) - Agronomy v0.1 by MThuy

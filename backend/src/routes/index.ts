@@ -5,10 +5,29 @@ import { authRouter } from './auth.routes';
 import { ruleRouter } from './rule.routes';
 import { thingSpeakService } from '../services/thingspeak.service';
 import { sensorBridgeService } from '../services/sensor-bridge.service';
+import {
+  claimUserDeviceHandler,
+  getUserDevicesHandler,
+  updateUserDeviceNameHandler,
+  removeUserDeviceHandler,
+  setActiveDeviceHandler,
+} from '../controllers/device.controller';
+import { authenticate } from '../middlewares/auth.middleware';
 
 export const apiRouter = Router();
 
 apiRouter.use('/auth', authRouter);
+apiRouter.use('/users', authRouter);
+
+// Dedicated user devices route (/api/v1/user/devices...)
+const userDeviceRouter = Router();
+userDeviceRouter.get('/devices', authenticate, getUserDevicesHandler);
+userDeviceRouter.post('/devices', authenticate, claimUserDeviceHandler);
+userDeviceRouter.patch('/devices/:device_id', authenticate, updateUserDeviceNameHandler);
+userDeviceRouter.delete('/devices/:device_id', authenticate, removeUserDeviceHandler);
+userDeviceRouter.put('/devices/:device_id/active', authenticate, setActiveDeviceHandler);
+apiRouter.use('/user', userDeviceRouter);
+
 apiRouter.use('/rules', ruleRouter);
 apiRouter.use('/readings', readingRouter);
 apiRouter.use('/devices', deviceRouter);

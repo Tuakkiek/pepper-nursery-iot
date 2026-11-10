@@ -198,7 +198,10 @@ export class SensorBridgeService {
         if (feed.id) {
           this.lastEntryId = Math.max(this.lastEntryId || 0, feed.id);
         }
-        const dto = this.mapFeedToDto(feed, sb.deviceId);
+        const channelDeviceId = String(feed.channel_id || sb.channelId || '1');
+        // Register device with id from API read (e.g. '1') and name from ESP32 ('esp32-nursery-01')
+        await readingService.ensureDevice(channelDeviceId, 'esp32-nursery-01');
+        const dto = this.mapFeedToDto(feed, channelDeviceId);
         const itemReceivedAt = dto.recorded_at || nowIso;
         items.push({ reading: dto, received_at: itemReceivedAt });
 
@@ -291,10 +294,26 @@ export const sensorBridgeService = new SensorBridgeService();
 readingService.setFallbackGetters(
   (deviceId: string) => {
     const cached = sensorBridgeService.getCachedLatestReading();
-    return cached && cached.device_id === deviceId ? cached : null;
+    if (!cached) return null;
+    if (
+      cached.device_id === deviceId ||
+      deviceId === '1' ||
+      deviceId === 'esp32-nursery-01' ||
+      deviceId === 'me'
+    ) {
+      return cached;
+    }
+    return null;
   },
   (deviceId: string, limit: number, options?: any) => {
     const items = sensorBridgeService.getCachedHistory(limit, options);
+    if (
+      deviceId === '1' ||
+      deviceId === 'esp32-nursery-01' ||
+      deviceId === 'me'
+    ) {
+      return items;
+    }
     return items.filter((i) => i.reading.device_id === deviceId);
   }
 );
