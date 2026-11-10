@@ -3,137 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vườn Ươm Ớt Con IoT — Web Dashboard</title>
-  <link rel="stylesheet" href="css/design-system.css">
-  <link rel="stylesheet" href="css/dashboard.css">
+  <title>Vườn Ươm Ớt Con IoT — Web Dashboard (React + Vite)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
 </head>
 <body>
-
-  <main class="dashboard-container">
-
-    <!-- Header & Navigation -->
-    <header class="header-bar">
-      <div class="brand-section">
-        <div class="brand-title-wrap">
-          <div class="brand-icon" aria-hidden="true">🌱</div>
-          <div>
-            <h1 class="brand-title">Vườn Ươm Ớt Con IoT</h1>
-            <p class="brand-subtitle">Dashboard theo dõi môi trường và hỗ trợ chăm sóc ớt con · Mốc G0 v0.1</p>
-          </div>
-        </div>
-
-        <div class="toolbar-group">
-          <!-- Nút kích hoạt đồng bộ ThingSpeak sang Backend TDat -->
-          <button id="btn-sync-thingspeak" class="btn btn-secondary btn-sm" aria-label="Đồng bộ từ ThingSpeak" title="Kích hoạt Backend đồng bộ số đo mới từ ThingSpeak">
-            📡 Đồng bộ ThingSpeak
-          </button>
-          <span id="last-refreshed-label" style="font-size: 13px; color: var(--color-text-secondary);"></span>
-          <button id="btn-refresh" class="btn btn-primary btn-sm" aria-label="Làm mới dữ liệu">
-            🔄 Làm mới
-          </button>
-        </div>
-      </div>
-
-      <!-- Control Toolbar: Chọn Thiết Bị, Nguồn Dữ Liệu và Kịch Bản Mock -->
-      <nav class="control-toolbar" aria-label="Thanh điều khiển môi trường">
-        <div class="toolbar-group">
-          <label for="device-select" class="toolbar-label">Thiết bị:</label>
-          <select id="device-select" class="select-control">
-            <option value="esp32-nursery-01" selected>esp32-nursery-01 (Trạm vườn ươm 01 - Có số đo)</option>
-            <option value="esp32-stale-01">esp32-stale-01 (Trạm mất liên lạc - Dữ liệu cũ)</option>
-            <option value="esp32-empty-01">esp32-empty-01 (Trạm mới - Chưa có dữ liệu)</option>
-            <option value="esp32-unknown">esp32-unknown (Kiểm thử lỗi 404 Không tìm thấy)</option>
-          </select>
-        </div>
-
-        <div class="toolbar-group">
-          <label for="data-mode-select" class="toolbar-label">Nguồn dữ liệu:</label>
-          <select id="data-mode-select" class="select-control" style="font-weight: 600;">
-            <option value="REAL_API" selected>🌐 API Thật (Backend: 8000)</option>
-            <option value="FIXTURE">📦 Dữ liệu mẫu (Fixtures G0 Mock)</option>
-          </select>
-        </div>
-
-        <!-- Fixture Scenarios Group (Hiển thị khi chọn FIXTURE) -->
-        <div id="fixture-control-group" class="toolbar-group" style="display: none;">
-          <label for="fixture-scenario-select" class="toolbar-label">Kịch bản mock:</label>
-          <select id="fixture-scenario-select" class="select-control" style="border-color: var(--color-teal); background-color: var(--color-teal-soft);">
-            <option value="normal">1. Mẫu bình thường (latest-normal.json)</option>
-            <option value="uncalibrated">2. Chưa hiệu chuẩn (latest-uncalibrated.json)</option>
-            <option value="partial_error">3. Lỗi một cảm biến (latest-partial-error.json)</option>
-            <option value="stale">4. Dữ liệu cũ > 5 phút (latest-stale.json)</option>
-            <option value="empty">5. Chưa có bản ghi (latest-empty.json)</option>
-            <option value="zero_valid">6. Số đo hợp lệ bằng 0 (0 != null)</option>
-            <option value="with_advice">7. Có lời khuyên chăm sóc từ Backend</option>
-            <option value="server_error">8. Lỗi máy chủ (server-error.json)</option>
-          </select>
-        </div>
-
-        <!-- Real API Config Group (Hiển thị khi chọn REAL_API) -->
-        <div id="api-control-group" class="toolbar-group">
-          <label for="api-url-input" class="toolbar-label">Backend URL:</label>
-          <input type="text" id="api-url-input" class="select-control" value="http://localhost:8000" placeholder="http://localhost:8000" style="width: 190px;">
-          <button id="btn-save-api-url" class="btn btn-secondary btn-sm">Cập nhật</button>
-        </div>
-      </nav>
-    </header>
-
-    <!-- Notification Toast / Banner -->
-    <aside id="fixture-banner" class="fixture-banner" role="status">
-      <div id="fixture-banner-text">
-        <strong>Trạng thái kết nối:</strong> Đang kết nối Backend TDat tại <code>http://localhost:8000</code>.
-      </div>
-    </aside>
-
-    <!-- Error Alert Box -->
-    <div id="error-alert" class="card state-box" style="display: none; border-color: var(--color-coral); background-color: var(--color-coral-soft); margin-bottom: var(--space-6);">
-      <div class="state-box-icon">⚠️</div>
-      <div class="state-box-title" style="color: var(--color-coral-strong);">Không tải được dữ liệu từ Backend</div>
-      <p id="error-alert-message" class="state-box-desc" style="color: var(--color-coral-strong);">
-        Lỗi kết nối API hoặc máy chủ backend không phản hồi.
-      </p>
-      <div style="display: flex; gap: var(--space-2); margin-top: var(--space-2);">
-        <button id="btn-retry" class="btn btn-danger btn-sm">Thử lại</button>
-        <button id="btn-switch-to-fixture" class="btn btn-secondary btn-sm">Chuyển sang Dữ liệu mẫu (Fixture)</button>
-      </div>
-    </div>
-
-    <!-- 1. Trạng thái thiết bị & Thời gian (recorded_at vs received_at) -->
-    <section id="device-status-container" aria-label="Thông tin thiết bị và thời gian"></section>
-
-    <!-- 2. Nhận định & Lời khuyên chăm sóc (Chỉ hiển thị kết quả do Backend tính theo MThuy) -->
-    <section id="care-advice-container" class="care-advice-section" aria-label="Khuyến nghị chăm sóc vườn ươm"></section>
-
-    <!-- 3. Lưới các thẻ số đo cảm biến (Nhiệt độ/Độ ẩm KK, Nhiệt độ/Độ ẩm đất, TDS/pH nước) -->
-    <section aria-label="Số đo cảm biến hiện tại">
-      <div class="section-header">
-        <h2 class="section-title">Số đo môi trường mới nhất</h2>
-      </div>
-      <div id="metrics-container" class="metrics-grid"></div>
-    </section>
-
-    <!-- 4. Khu vực Lịch sử & Biểu đồ xu hướng -->
-    <section class="history-section" aria-label="Lịch sử số đo">
-      <div class="section-header">
-        <h2 class="section-title">Lịch sử & Xu hướng theo dõi</h2>
-      </div>
-      <div id="history-container" class="card history-card"></div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="dashboard-footer">
-      <div>
-        <strong>Pepper Nursery IoT MVP</strong> · Phụ trách Web: <strong>DKhoa</strong> · Tích hợp Backend: <strong>TDat</strong> (v0.1)
-      </div>
-      <div class="footer-tags">
-        <span class="badge badge-normal">🎨 Design System 1.0</span>
-        <span class="badge badge-info">📜 API Contract G0 v0.1</span>
-      </div>
-    </footer>
-
-  </main>
-
-  <!-- Module Script -->
-  <script type="module" src="js/app.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

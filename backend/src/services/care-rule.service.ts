@@ -181,9 +181,9 @@ export class CareRuleService {
       return null;
     }
 
-    const triggeredDangers: string[] = [];
-    const triggeredWarnings: string[] = [];
-    const triggeredInfos: string[] = [];
+    const triggeredDangers: { rule: CareRuleRecord; advice: string }[] = [];
+    const triggeredWarnings: { rule: CareRuleRecord; advice: string }[] = [];
+    const triggeredInfos: { rule: CareRuleRecord; advice: string }[] = [];
     let evaluatedCount = 0;
 
     for (const rule of rules) {
@@ -225,11 +225,11 @@ export class CareRuleService {
         const matches = this.isConditionMet(sensorVal, rule.operator, rule.threshold_min, rule.threshold_max);
         if (matches) {
           if (rule.severity === 'danger') {
-            triggeredDangers.push(rule.action_advice);
+            triggeredDangers.push({ rule, advice: rule.action_advice });
           } else if (rule.severity === 'warning') {
-            triggeredWarnings.push(rule.action_advice);
+            triggeredWarnings.push({ rule, advice: rule.action_advice });
           } else {
-            triggeredInfos.push(rule.action_advice);
+            triggeredInfos.push({ rule, advice: rule.action_advice });
           }
         }
       }
@@ -237,40 +237,58 @@ export class CareRuleService {
 
     if (evaluatedCount === 0) {
       return {
-        version: 'dynamic-v1',
-        status: 'warning',
+        version: '0.1',
+        status: 'insufficient_data',
+        priority: 1,
+        code: 'ERR_INSUFFICIENT_DATA',
         message: 'Chưa đủ dữ liệu cảm biến hợp lệ hoặc cảm biến chưa hiệu chuẩn để đưa ra lời khuyên chăm sóc.',
+        suggested_action: 'Kiểm tra lại kết nối phần cứng trạm ESP32 hoặc hoàn tất quy trình hiệu chuẩn cảm biến.',
       };
     }
 
     if (triggeredDangers.length > 0) {
+      const first = triggeredDangers[0];
       return {
-        version: 'dynamic-v1',
+        version: '0.1',
         status: 'danger',
-        message: triggeredDangers.concat(triggeredWarnings).join(' '),
+        priority: 2,
+        code: first.rule.rule_code || 'ERR_CARE_DANGER',
+        message: triggeredDangers.map((d) => `${d.rule.name}: ${d.advice}`).join(' | '),
+        suggested_action: triggeredDangers.map((d) => d.advice).join('; '),
       };
     }
 
     if (triggeredWarnings.length > 0) {
+      const first = triggeredWarnings[0];
       return {
-        version: 'dynamic-v1',
+        version: '0.1',
         status: 'warning',
-        message: triggeredWarnings.concat(triggeredInfos).join(' '),
+        priority: 3,
+        code: first.rule.rule_code || 'WARN_CARE_WARNING',
+        message: triggeredWarnings.map((w) => `${w.rule.name}: ${w.advice}`).join(' | '),
+        suggested_action: triggeredWarnings.map((w) => w.advice).join('; '),
       };
     }
 
     if (triggeredInfos.length > 0) {
+      const first = triggeredInfos[0];
       return {
-        version: 'dynamic-v1',
-        status: 'ok',
-        message: triggeredInfos.join(' '),
+        version: '0.1',
+        status: 'optimal',
+        priority: 4,
+        code: first.rule.rule_code || 'INFO_CARE_NOTICE',
+        message: triggeredInfos.map((i) => `${i.rule.name}: ${i.advice}`).join(' | '),
+        suggested_action: triggeredInfos.map((i) => i.advice).join('; '),
       };
     }
 
     return {
-      version: 'dynamic-v1',
-      status: 'ok',
-      message: 'Các chỉ số môi trường vườn ươm ớt con đang ở mức tối ưu.',
+      version: '0.1',
+      status: 'optimal',
+      priority: 5,
+      code: 'ENV_OPTIMAL',
+      message: 'Tuyệt vời: Môi trường vườn ươm ớt con đang ở điều kiện sinh trưởng lý tưởng nhất!',
+      suggested_action: 'Duy trì chế độ thông gió và lịch tưới ổn định hiện tại (1-2 lần/ngày).',
     };
   }
 }

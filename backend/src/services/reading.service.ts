@@ -25,6 +25,29 @@ export interface HistoryResponse {
   readings: HistoryItem[];
 }
 
+export interface RangeResponse {
+  device_id: string;
+  start_date: string;
+  end_date: string;
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  readings: HistoryItem[];
+}
+
+export interface HistoryQueryOptions {
+  limit?: number;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  tz?: string;
+  order?: 'desc' | 'asc';
+  page?: number;
+  page_size?: number;
+}
+
 export function computePayloadHash(dto: IngestReadingDto): string {
   // Canonical string: sort keys to ensure stable hash
   const canonicalObj = {
@@ -55,10 +78,24 @@ export function computePayloadHash(dto: IngestReadingDto): string {
 export function formatUtcIso(d: Date | string | null): string | null {
   if (!d) return null;
   const dateObj = typeof d === 'string' ? new Date(d) : d;
-  return dateObj.toISOString().replace('.000Z', 'Z');
+  if (isNaN(dateObj.getTime())) return null;
+  return dateObj.toISOString();
 }
 
 export class ReadingService {
+  private fallbackLatestGetter: ((deviceId: string) => IngestReadingDto | null) | null = null;
+  private fallbackHistoryGetter: (
+    (deviceId: string, limit: number, options?: HistoryQueryOptions) => HistoryItem[] | null
+  ) | null = null;
+
+  setFallbackGetters(
+    latest: (deviceId: string) => IngestReadingDto | null,
+    history: (deviceId: string, limit: number, options?: HistoryQueryOptions) => HistoryItem[] | null
+  ) {
+    this.fallbackLatestGetter = latest;
+    this.fallbackHistoryGetter = history;
+  }
+
   async ensureDevice(deviceId: string, name?: string): Promise<void> {
     await pool.query(
       `INSERT INTO devices (device_id, name)
@@ -157,6 +194,34 @@ export class ReadingService {
     );
 
     if (rows.length === 0) {
+      if (this.fallbackLatestGetter) {
+        const cached = this.fallbackLatestGetter(deviceId);
+        if (cached) {
+          let isStale: boolean | null = null;
+          if (cached.recorded_at) {
+            const recordedTime = new Date(cached.recorded_at).getTime();
+            const diffMinutes = (Date.now() - recordedTime) / (1000 * 60);
+            isStale = diffMinutes > config.staleThresholdMinutes;
+          }
+
+          let advice: AdviceResult | null = null;
+          if (ruleService.isEnabled()) {
+            advice = await careRuleService.evaluateActiveRules(cached, isStale);
+            if (!advice) {
+              advice = ruleService.evaluate(cached, isStale);
+            }
+          }
+
+          return {
+            device_id: deviceId,
+            reading: cached,
+            received_at: cached.recorded_at || new Date().toISOString(),
+            is_stale: isStale,
+            advice,
+          };
+        }
+      }
+
       return {
         device_id: deviceId,
         reading: null,
@@ -170,6 +235,10 @@ export class ReadingService {
     const reading: IngestReadingDto = typeof row.raw_payload === 'string'
       ? JSON.parse(row.raw_payload)
       : row.raw_payload;
+
+    if (reading && reading.recorded_at) {
+      reading.recorded_at = formatUtcIso(reading.recorded_at);
+    }
 
     let isStale: boolean | null = null;
     if (reading.recorded_at) {
@@ -215,14 +284,148 @@ export class ReadingService {
       [deviceId, limit]
     );
 
-    const items: HistoryItem[] = rows.map((r) => ({
-      reading: typeof r.raw_payload === 'string' ? JSON.parse(r.raw_payload) : r.raw_payload,
-      received_at: formatUtcIso(r.received_at)!,
-    }));
+    if (rows.length === 0 && this.fallbackHistoryGetter) {
+      const cachedItems = this.fallbackHistoryGetter(deviceId, limit);
+      if (cachedItems && cachedItems.length > 0) {
+        return {
+          device_id: deviceId,
+          limit,
+          readings: cachedItems,
+        };
+      }
+    }
+
+    const items: HistoryItem[] = rows.map((r) => {
+      const reading: IngestReadingDto = typeof r.raw_payload === 'string'
+        ? JSON.parse(r.raw_payload)
+        : r.raw_payload;
+      if (reading && reading.recorded_at) {
+        reading.recorded_at = formatUtcIso(reading.recorded_at);
+      }
+      return {
+        reading,
+        received_at: formatUtcIso(r.received_at)!,
+      };
+    });
 
     return {
       device_id: deviceId,
       limit,
+      readings: items,
+    };
+  }
+
+  async getRangeReadings(
+    deviceId: string,
+    options: {
+      start_date: string;
+      end_date: string;
+      start_time?: string;
+      end_time?: string;
+      tz?: string;
+      order?: 'desc' | 'asc';
+      page?: number;
+      page_size?: number;
+      limit?: number;
+    }
+  ): Promise<RangeResponse | null> {
+    const exists = await this.deviceExists(deviceId);
+    if (!exists) {
+      return null;
+    }
+
+    const page = Math.max(1, options.page || 1);
+    const pageSize = Math.min(100, Math.max(1, options.page_size || 20));
+    const order = options.order === 'asc' ? 'ASC' : 'DESC';
+
+    const startTime = options.start_time || '00:00:00';
+    const endTime = options.end_time || '23:59:59';
+    const startIso = `${options.start_date} ${startTime}`;
+    const endIso = `${options.end_date} ${endTime}`;
+
+    // Try DB query first
+    const [countRows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as cnt
+       FROM readings
+       WHERE device_id = ?
+         AND (
+           (recorded_at IS NOT NULL AND recorded_at >= ? AND recorded_at <= ?)
+           OR (recorded_at IS NULL AND received_at >= ? AND received_at <= ?)
+         )`,
+      [deviceId, startIso, endIso, startIso, endIso]
+    );
+
+    const dbTotal = Number((countRows[0] as any)?.cnt || 0);
+
+    // If no DB rows found, try fallback from sensor-bridge cache
+    if (dbTotal === 0 && this.fallbackHistoryGetter) {
+      const allCached = this.fallbackHistoryGetter(deviceId, 1000, {
+        start_date: options.start_date,
+        end_date: options.end_date,
+        start_time: options.start_time,
+        end_time: options.end_time,
+        order: options.order,
+      });
+
+      if (allCached) {
+        const total = allCached.length;
+        const totalPages = Math.ceil(total / pageSize) || 1;
+        const offset = (page - 1) * pageSize;
+        const pagedReadings = options.limit
+          ? allCached.slice(0, Math.min(options.limit, pageSize))
+          : allCached.slice(offset, offset + pageSize);
+
+        return {
+          device_id: deviceId,
+          start_date: options.start_date,
+          end_date: options.end_date,
+          total,
+          page,
+          page_size: pageSize,
+          total_pages: totalPages,
+          readings: pagedReadings,
+        };
+      }
+    }
+
+    const offset = (page - 1) * pageSize;
+    const fetchLimit = options.limit ? Math.min(options.limit, pageSize) : pageSize;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT raw_payload, received_at
+       FROM readings
+       WHERE device_id = ?
+         AND (
+           (recorded_at IS NOT NULL AND recorded_at >= ? AND recorded_at <= ?)
+           OR (recorded_at IS NULL AND received_at >= ? AND received_at <= ?)
+         )
+       ORDER BY COALESCE(recorded_at, received_at) ${order}
+       LIMIT ? OFFSET ?`,
+      [deviceId, startIso, endIso, startIso, endIso, fetchLimit, offset]
+    );
+
+    const items: HistoryItem[] = rows.map((r) => {
+      const reading: IngestReadingDto =
+        typeof r.raw_payload === 'string' ? JSON.parse(r.raw_payload) : r.raw_payload;
+      if (reading && reading.recorded_at) {
+        reading.recorded_at = formatUtcIso(reading.recorded_at);
+      }
+      return {
+        reading,
+        received_at: formatUtcIso(r.received_at)!,
+      };
+    });
+
+    const totalPages = Math.ceil(dbTotal / pageSize) || 1;
+
+    return {
+      device_id: deviceId,
+      start_date: options.start_date,
+      end_date: options.end_date,
+      total: dbTotal,
+      page,
+      page_size: pageSize,
+      total_pages: totalPages,
       readings: items,
     };
   }

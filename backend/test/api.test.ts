@@ -83,6 +83,25 @@ async function runTests() {
       console.log('✓ GET history readings with limit passed');
     }
 
+    // 5b. Test GET /api/v1/devices/esp32-nursery-01/readings/range (Date range filtering)
+    {
+      const res = await request(
+        '/api/v1/devices/esp32-nursery-01/readings/range?start_date=2026-01-01&end_date=2026-12-31'
+      );
+      console.assert(res.status === 200, `Range expected 200, got ${res.status}`);
+      console.assert(res.body.device_id === 'esp32-nursery-01', 'device_id match');
+      console.assert(Array.isArray(res.body.readings), 'readings should be array');
+      console.assert(res.body.total >= 0, 'total should be non-negative');
+      console.log('✓ GET range readings with start_date & end_date passed');
+    }
+
+    // 5c. Test GET /api/v1/devices/esp32-nursery-01/readings/range missing params -> 422
+    {
+      const res = await request('/api/v1/devices/esp32-nursery-01/readings/range');
+      console.assert(res.status === 422, `Missing range params expected 422, got ${res.status}`);
+      console.log('✓ GET range readings without dates returns 422 passed');
+    }
+
     // 6. Test POST /api/v1/readings (New reading -> 201 Created)
     const testSampleId = `sample-test-${Date.now()}`;
     const newPayload = {
@@ -149,12 +168,17 @@ async function runTests() {
       console.log('✓ POST invalid reading (400 Bad Request) passed');
     }
 
-    // 10. Test GET /api/v1/sync/thingspeak/status
+    // 10. Test GET /api/v1/sync/bridge/status & /api/v1/sync/thingspeak/status
+    {
+      const res = await request('/api/v1/sync/bridge/status');
+      console.assert(res.status === 200, `Bridge status expected 200, got ${res.status}`);
+      console.assert(res.body.data.channelId === 1 || res.body.data.channelId === '1', 'Channel ID should be 1');
+      console.log('✓ GET Sensor Data Bridge sync status passed');
+    }
     {
       const res = await request('/api/v1/sync/thingspeak/status');
       console.assert(res.status === 200, `ThingSpeak status expected 200, got ${res.status}`);
-      console.assert(res.body.data.channelId === '3543608', 'Channel ID should be 3543608');
-      console.log('✓ GET ThingSpeak sync status passed');
+      console.log('✓ GET ThingSpeak legacy status (aliased) passed');
     }
 
     // 11. Test Rule Engine Evaluation (when toggled on/off)
