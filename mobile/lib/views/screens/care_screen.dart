@@ -123,8 +123,8 @@ class _CareScreenState extends State<CareScreen> {
             ] else if (displayAdvice != null && displayAdvice.isNotEmpty) ...[
               _buildInfoCard(
                 title: isAdviceWarning
-                    ? 'Cảnh báo chăm sóc từ Backend'
-                    : 'Khuyến nghị hiện tại từ Backend',
+                    ? 'Cảnh báo chăm sóc'
+                    : 'Khuyến nghị chăm sóc hiện tại',
                 message: displayAdvice,
                 isWarning: isAdviceWarning,
               ),
@@ -139,31 +139,9 @@ class _CareScreenState extends State<CareScreen> {
             const SizedBox(height: AppSpacing.space6),
 
             // 2. Danh sách quy tắc động từ Backend API (/api/v1/rules)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Quy tắc chăm sóc hệ thống',
-                  style: AppTypography.sectionTitle,
-                ),
-                if (widget.apiService.mode == DataSourceMode.live)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.tealSoft,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'API Backend',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.navy),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.space1),
             const Text(
-              '',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              'Quy tắc chăm sóc hệ thống',
+              style: AppTypography.sectionTitle,
             ),
             const SizedBox(height: AppSpacing.space3),
 

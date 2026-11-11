@@ -69,7 +69,7 @@ class ApiService extends ChangeNotifier {
         id: 2,
         username: 'user',
         role: 'user',
-        fullName: 'Kỹ thuật viên Vườn ươm',
+        fullName: 'user',
         selectedDeviceId: '1',
       ),
     ),

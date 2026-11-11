@@ -11,14 +11,10 @@ import '../widgets/reading_filter_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
-  final VoidCallback? onOpenLogin;
-  final VoidCallback? onLogout;
 
   const DashboardScreen({
     super.key,
     required this.apiService,
-    this.onOpenLogin,
-    this.onLogout,
   });
 
   @override
@@ -162,11 +158,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             vertical: AppSpacing.space3,
           ),
           children: [
-            if (widget.apiService.isAuthenticated || widget.onOpenLogin != null) ...[
-              _buildAccountBanner(),
-              const SizedBox(height: AppSpacing.space3),
-            ],
-
             // Thanh chuyển kịch bản nhanh cho Phase 1 (khi ở chế độ Fixture)
             if (isFixture) ...[
               _buildQuickScenarioSelector(),
@@ -207,72 +198,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildEmptyState(),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildAccountBanner() {
-    final user = widget.apiService.currentUser;
-    final isAuthenticated = widget.apiService.isAuthenticated && user != null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.space3,
-        vertical: AppSpacing.space2,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.control),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isAuthenticated ? Icons.verified_user_outlined : Icons.person_outline,
-            size: 18,
-            color: AppColors.navy,
-          ),
-          const SizedBox(width: AppSpacing.space2),
-          Expanded(
-            child: isAuthenticated
-                ? Text(
-                    '${user.fullName} (${user.role.toUpperCase()})',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.navy,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  )
-                : const Text(
-                    'Chế độ Khách (Chưa đăng nhập)',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-          ),
-          const SizedBox(width: AppSpacing.space2),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: isAuthenticated ? AppColors.coralStrong : AppColors.navy,
-              minimumSize: const Size(44, 36),
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space2),
-              textStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            onPressed: isAuthenticated
-                ? () {
-                    widget.apiService.logout();
-                    widget.onLogout?.call();
-                  }
-                : widget.onOpenLogin,
-            child: Text(isAuthenticated ? 'Đăng xuất' : 'Đăng nhập'),
-          ),
-        ],
       ),
     );
   }

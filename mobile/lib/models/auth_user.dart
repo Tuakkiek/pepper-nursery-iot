@@ -51,5 +51,15 @@ class AuthUser {
   }
 
   bool get isAdmin => role == 'admin';
+
+  String get displayName {
+    final cleanName = fullName.trim();
+    if (role.toLowerCase() == 'user' &&
+        (cleanName.isEmpty ||
+            cleanName.toLowerCase() == 'kỹ thuật viên vườn ươm')) {
+      return 'user';
+    }
+    return cleanName.isNotEmpty ? cleanName : username;
+  }
 }
 

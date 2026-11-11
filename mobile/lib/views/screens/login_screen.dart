@@ -8,13 +8,11 @@ import 'register_screen.dart';
 class LoginScreen extends StatefulWidget {
   final ApiService apiService;
   final VoidCallback? onLoginSuccess;
-  final VoidCallback? onContinueAsGuest;
 
   const LoginScreen({
     super.key,
     required this.apiService,
     this.onLoginSuccess,
-    this.onContinueAsGuest,
   });
 
   @override
@@ -96,14 +94,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _fillDemoCredentials(String username, String password) {
-    setState(() {
-      _usernameController.text = username;
-      _passwordController.text = password;
-      _errorMessage = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -182,39 +172,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                     return null;
                                   },
                                 ),
-                                const SizedBox(height: AppSpacing.space3),
-                                Wrap(
-                                  spacing: AppSpacing.space2,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    const Text(
-                                      'Điền nhanh:',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    ActionChip(
-                                      label: const Text(
-                                        'user',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: () =>
-                                          _fillDemoCredentials('user', 'user123'),
-                                    ),
-                                    ActionChip(
-                                      label: const Text(
-                                        'admin',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: () =>
-                                          _fillDemoCredentials('admin', 'admin123'),
-                                    ),
-                                  ],
-                                ),
                                 const SizedBox(height: AppSpacing.space4),
                                 ElevatedButton(
                                   onPressed: _isSubmitting ? null : _submit,
@@ -264,14 +221,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                         ),
-                        if (widget.onContinueAsGuest != null) ...[
-                          const SizedBox(height: AppSpacing.space2),
-                          OutlinedButton(
-                            onPressed:
-                                _isSubmitting ? null : widget.onContinueAsGuest,
-                            child: const Text('Tiếp tục không cần đăng nhập'),
-                          ),
-                        ],
                       ],
                     ),
                   ),

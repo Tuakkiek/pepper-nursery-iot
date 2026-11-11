@@ -38,7 +38,6 @@ class PepperNurseryApp extends StatefulWidget {
 class _PepperNurseryAppState extends State<PepperNurseryApp> {
   ApiService? _apiService;
   bool _ownsApiService = false;
-  bool _isGuestMode = false;
   bool _lastIsAuthenticated = false;
 
   ApiService get _service {
@@ -79,29 +78,14 @@ class _PepperNurseryAppState extends State<PepperNurseryApp> {
     }
   }
 
-  void _enterGuestMode() {
-    setState(() {
-      _isGuestMode = true;
-    });
-  }
-
-  void _openLoginScreen() {
-    setState(() {
-      _isGuestMode = false;
-    });
-  }
-
   void _handleLogout() {
-    setState(() {
-      _isGuestMode = false;
-    });
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final service = _service;
-    final showMainApp =
-        widget.skipAuthGate || service.isAuthenticated || _isGuestMode;
+    final showMainApp = widget.skipAuthGate || service.isAuthenticated;
 
     return MaterialApp(
       title: 'Vườn Ươm Ớt Con',
@@ -112,12 +96,10 @@ class _PepperNurseryAppState extends State<PepperNurseryApp> {
       home: showMainApp
           ? MainNavigationScreen(
               apiService: service,
-              onOpenLogin: _openLoginScreen,
               onLogout: _handleLogout,
             )
           : LoginScreen(
               apiService: service,
-              onContinueAsGuest: _enterGuestMode,
             ),
     );
   }
@@ -187,11 +169,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final service = _service;
     final screens = [
-      DashboardScreen(
-        apiService: service,
-        onOpenLogin: widget.onOpenLogin,
-        onLogout: widget.onLogout,
-      ),
+      DashboardScreen(apiService: service),
       HistoryScreen(apiService: service),
       CareScreen(apiService: service, latestData: _cachedLatestData),
       AccountScreen(

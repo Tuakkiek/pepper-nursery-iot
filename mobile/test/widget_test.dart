@@ -14,31 +14,39 @@ void main() {
   setUp(() {
     rootBundle.clear();
   });
-  testWidgets('Guest navigation and main tabs smoke test', (WidgetTester tester) async {
+  testWidgets('Login gate hides quick-fill & guest button, and navigates main tabs after login', (WidgetTester tester) async {
     final apiService = ApiService()
       ..mode = DataSourceMode.fixture
       ..autoRefresh = false;
 
     await tester.pumpWidget(PepperNurseryApp(apiService: apiService));
 
-    // Màn hình khởi đầu là Đăng nhập
+    // Màn hình khởi đầu là Đăng nhập, không còn nút điền nhanh và nút tiếp tục không cần đăng nhập
     expect(find.text('Vườn Ươm Ớt Con'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Đăng nhập'), findsOneWidget);
     expect(find.text('Đăng ký ngay'), findsOneWidget);
+    expect(find.text('Điền nhanh:'), findsNothing);
+    expect(find.byType(ActionChip), findsNothing);
+    expect(find.text('Tiếp tục không cần đăng nhập'), findsNothing);
 
-    // Tiếp tục không cần đăng nhập (Chế độ Khách)
-    final guestButton = find.text('Tiếp tục không cần đăng nhập');
-    await tester.ensureVisible(guestButton);
-    await tester.tap(guestButton);
+    // Đăng nhập tài khoản user
+    final loginFields = find.byType(TextFormField);
+    await tester.enterText(loginFields.at(0), 'user');
+    await tester.enterText(loginFields.at(1), 'user123');
+    final loginButton = find.widgetWithText(ElevatedButton, 'Đăng nhập');
+    await tester.ensureVisible(loginButton);
+    await tester.tap(loginButton);
     await _settleWithAsyncAssets(tester);
 
-    // Kiểm tra AppBar và các tab điều hướng
+    // Kiểm tra AppBar, không còn banner đăng xuất trên Dashboard và đủ 4 tab điều hướng
     expect(find.text('Vườn Ươm Ớt Con'), findsOneWidget);
     expect(find.text('Tổng quan'), findsOneWidget);
     expect(find.text('Lịch sử'), findsOneWidget);
     expect(find.text('Chăm sóc'), findsOneWidget);
     expect(find.text('Tài khoản'), findsOneWidget);
-    expect(find.text('Chế độ Khách (Chưa đăng nhập)'), findsOneWidget);
+    expect(find.text('Đăng xuất'), findsNothing);
+    expect(find.text('user (USER)'), findsNothing);
+    expect(find.textContaining('Kỹ thuật viên Vườn ươm'), findsNothing);
 
     // Chuyển sang tab Lịch sử
     await tester.tap(find.text('Lịch sử'));
@@ -49,18 +57,27 @@ void main() {
     await tester.tap(find.text('Chăm sóc'));
     await _settleWithAsyncAssets(tester);
     expect(find.text('Quy Tắc Chăm Sóc'), findsOneWidget);
+    expect(find.text('Cảnh báo chăm sóc'), findsOneWidget);
+    expect(find.text('Cảnh báo chăm sóc từ Backend'), findsNothing);
+    expect(find.text('API Backend'), findsNothing);
 
-    // Chuyển sang tab Tài khoản (trạng thái Khách)
+    // Chuyển sang tab Tài khoản (trạng thái đã đăng nhập) và đăng xuất từ tab Tài khoản
     await tester.tap(find.text('Tài khoản'));
     await _settleWithAsyncAssets(tester);
     expect(find.text('Tài Khoản'), findsOneWidget);
-    expect(find.text('Đăng nhập tài khoản'), findsOneWidget);
-    expect(find.text('Đăng ký tài khoản mới'), findsOneWidget);
+    expect(find.text('user'), findsOneWidget);
+    expect(find.textContaining('Kỹ thuật viên Vườn ươm'), findsNothing);
 
-    // Quay lại tab Tổng quan và mở lại màn hình Đăng nhập
-    await tester.tap(find.text('Tổng quan'));
-    await _settleWithAsyncAssets(tester);
-    await tester.tap(find.widgetWithText(TextButton, 'Đăng nhập'));
+    final logoutBtn = find.text('Đăng xuất tài khoản');
+    await tester.scrollUntilVisible(
+      logoutBtn,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(logoutBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Đăng xuất'));
     await _settleWithAsyncAssets(tester);
     expect(find.text('Chưa có tài khoản?'), findsOneWidget);
 
@@ -110,26 +127,38 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng ký'));
     await _settleWithAsyncAssets(tester);
 
-    // 5. Sau khi đăng ký thành công, vào màn hình chính với tên người dùng mới
+    // 5. Sau khi đăng ký thành công, vào màn hình chính và xác nhận tên ở tab Tài khoản
     expect(apiService.isAuthenticated, isTrue);
-    expect(find.text('Nguyễn Văn Ớt (USER)'), findsOneWidget);
+    await tester.tap(find.text('Tài khoản'));
+    await _settleWithAsyncAssets(tester);
+    expect(find.text('Nguyễn Văn Ớt'), findsOneWidget);
 
-    // 6. Đăng xuất quay về màn hình Đăng nhập và thử đăng nhập bằng nút điền nhanh admin
+    // 6. Đăng xuất từ tab Tài khoản về màn hình Đăng nhập và đăng nhập tài khoản admin
+    final logoutBtn = find.text('Đăng xuất tài khoản');
+    await tester.scrollUntilVisible(
+      logoutBtn,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(logoutBtn);
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Đăng xuất'));
     await _settleWithAsyncAssets(tester);
     expect(apiService.isAuthenticated, isFalse);
     expect(find.widgetWithText(ElevatedButton, 'Đăng nhập'), findsOneWidget);
 
-    final adminChip = find.widgetWithText(ActionChip, 'admin');
-    await tester.ensureVisible(adminChip);
-    await tester.tap(adminChip);
-    await tester.pump();
+    final loginFields = find.byType(TextFormField);
+    await tester.enterText(loginFields.at(0), 'admin');
+    await tester.enterText(loginFields.at(1), 'admin123');
     await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
     await tester.tap(find.widgetWithText(ElevatedButton, 'Đăng nhập'));
     await _settleWithAsyncAssets(tester);
 
     expect(apiService.isAuthenticated, isTrue);
-    expect(find.text('Quản trị viên Vườn ươm (ADMIN)'), findsOneWidget);
+    await tester.tap(find.text('Tài khoản'));
+    await _settleWithAsyncAssets(tester);
+    expect(find.text('Quản trị viên Vườn ươm'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     apiService.dispose();
@@ -267,13 +296,13 @@ void main() {
       ..mode = DataSourceMode.fixture
       ..autoRefresh = false;
 
-    // 1. LoginScreen không còn nút cài đặt backend
+    // 1. LoginScreen không còn nút cài đặt backend, điền nhanh hay tiếp tục không cần đăng nhập
     await tester.pumpWidget(PepperNurseryApp(apiService: apiService));
     expect(find.byIcon(Icons.tune), findsNothing);
+    expect(find.text('Điền nhanh:'), findsNothing);
+    expect(find.text('Tiếp tục không cần đăng nhập'), findsNothing);
 
-    final guestButton = find.text('Tiếp tục không cần đăng nhập');
-    await tester.ensureVisible(guestButton);
-    await tester.tap(guestButton);
+    await tester.pumpWidget(PepperNurseryApp(apiService: apiService, skipAuthGate: true));
     await _settleWithAsyncAssets(tester);
 
     // 2. Dashboard không còn nút cài đặt backend, hiển thị ID thiết bị và nút Thiết bị

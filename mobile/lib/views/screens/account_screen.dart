@@ -411,7 +411,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user.fullName.isNotEmpty ? user.fullName : user.username,
+                      user.displayName,
                       style: AppTypography.sectionTitle,
                       overflow: TextOverflow.ellipsis,
                     ),

@@ -158,7 +158,7 @@ export async function seedDatabase(): Promise<void> {
     INSERT INTO users (username, password_hash, full_name, role, selected_device_id)
     VALUES 
       ('admin', ?, 'Quản trị viên Vườn ươm', 'admin', '1'),
-      ('user', ?, 'Kỹ thuật viên Vườn ươm', 'user', '1')
+      ('user', ?, 'user', 'user', '1')
     ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role), selected_device_id = VALUES(selected_device_id)
   `, [adminHash, userHash]);
 
